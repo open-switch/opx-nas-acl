@@ -1,0 +1,23 @@
+Source: libopx-nas-acl
+Section: net
+Priority: optional
+Maintainer: Dell <support@dell.com>
+Build-Depends: debhelper (>= 9),dh-autoreconf,dh-systemd,autotools-dev,libopx-common-dev,libopx-cps-dev,libopx-logging-dev,libopx-nas-common-dev,opx-ndi-api-dev,libopx-nas-ndi-dev
+Standards-Version: 3.9.3
+Vcs-Browser: https://github.com/open-switch/opx-nas-acl
+Vcs-Git: https://github.com/open-switch/opx-nas-acl.git
+
+Package: libopx-nas-acl1
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},libopx-cps1,libopx-logging1,libopx-nas-common1,libopx-nas-ndi1
+Description: This package contains base ACL functionality for the Openswitch software.
+
+Package: libopx-nas-acl-dev
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends},libopx-common-dev,libopx-cps-dev,libopx-logging-dev,libopx-nas-acl1 (=${binary:Version}),libopx-nas-common-dev,opx-ndi-api-dev,libopx-nas-ndi-dev,libopx-base-model-dev
+Description: This package contains base ACL functionality for the Openswitch software.
+
+Package: opx-nas-acl
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, opx-cps, python-opx-cps, opx-nas-interface
+Description: This package contains base ACL scripts for the Openswitch software.

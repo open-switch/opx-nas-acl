@@ -1,0 +1,4 @@
+usr/bin/*
+etc/opx/*.xml
+usr/lib/*/opx/*.py
+lib/systemd/*

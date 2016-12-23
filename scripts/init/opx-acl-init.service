@@ -1,0 +1,17 @@
+[Unit]
+Description=Default ACL entries for Control Plane Protocol packets
+After=opx-create-interface.service
+Wants=opx-create-interface.service
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/opx/opx-environment
+ExecStart=/usr/bin/base_acl_copp_svc.sh
+RemainAfterExit=yes
+
+# Resource Limitations
+LimitNOFILE=16384
+
+[Install]
+WantedBy=multi-user.target
