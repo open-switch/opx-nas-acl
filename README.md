@@ -1,12 +1,4 @@
-opx-nas-acl
-===========
+# opx-nas-acl
+This repository contains the access control list (ACL) component of the network abstraction service (NAS). It provides a programmable interface to configure system flow entries, and data plane packet filters to the network processor unit (NPU). 
 
-Access Control List for the Open Switch Base Module.
-
-Description
------------
-
-This repo contains the ACL portion of the Network abstraction service. This provides a programmable interface to configure system-flow entries, data-plane packet filters to NPU. 
-
-(c) Dell 2016
-
+(c) 2017 Dell
