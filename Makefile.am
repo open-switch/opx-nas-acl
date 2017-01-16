@@ -16,7 +16,7 @@ libopx_nas_acl_la_SOURCES=src/nas_acl_init.cpp src/nas_acl_table.cpp src/nas_acl
 libopx_nas_acl_la_CPPFLAGS= -D_FILE_OFFSET_BITS=64 -I$(top_srcdir)/inc/opx -I$(includedir)/opx
 libopx_nas_acl_la_CXXFLAGS=-std=c++11
 libopx_nas_acl_la_LDFLAGS=-shared -version-info 1:1:0
-libopx_nas_acl_la_LIBADD=-lopx_common -lopx_nas_ndi -lopx_cps_class_map -lopx_cps_api_common -lopx_logging
+libopx_nas_acl_la_LIBADD=-lopx_common -lopx_nas_ndi -lopx_cps_api_common -lopx_logging -lopx_nas_linux -lopx_nas_common
 
 systemdconfdir=/lib/systemd/system
 systemdconf_DATA = scripts/init/*.service
