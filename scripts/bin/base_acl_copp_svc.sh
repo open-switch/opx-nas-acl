@@ -13,10 +13,12 @@
 # See the Apache Version 2.0 License for specific language governing
 # permissions and limitations under the License.
 
-export PYTHONPATH=/usr/lib/opx:/usr/lib/x86_64-linux-gnu/opx
+export LD_LIBRARY_PATH=/usr/lib/opx:/usr/lib/x86_64-linux-gnu:/usr/lib:/lib
+export PYTHONPATH=/usr/lib/opx  
 
 if [ -f /etc/opx/base_acl_nocreate ] ; then
    exit 0
 fi
-/usr/bin/python base_create_acl_entries.py
+
+/usr/bin/base_create_acl_entries.py
 
