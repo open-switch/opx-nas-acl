@@ -3,7 +3,7 @@ SUBDIRS = inc
 
 bin_SCRIPTS = scripts/bin/*
 
-cfgdir = $(sysconfdir)/opx
+cfgdir = $(sysconfdir)/opx/acl
 cfg_SCRIPTS = scripts/acl/*.xml
 
 pyutilsdir=$(libdir)/opx
