@@ -1,4 +1,4 @@
-Source: libopx-nas-acl
+Source: opx-nas-acl
 Section: net
 Priority: optional
 Maintainer: Dell EMC <ops-dev@lists.openswitch.net>
