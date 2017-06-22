@@ -120,8 +120,7 @@ static bool _add_data_to_obj (cps_api_object_t       obj,
         return true;
     }
 
-    if ((expected_size != 0) && (obj_data_type != NAS_ACL_DATA_IFNAME) &&
-        (expected_size != size)) {
+    if ((expected_size != 0) && (expected_size < size)) {
         NAS_ACL_LOG_ERR ("Size mismatch. expected_size: %ld, filled size: %ld",
                          expected_size, size);
 
@@ -488,8 +487,7 @@ static nas_acl_common_data_t _get_data_from_obj (cps_api_object_t           obj,
     auto attr_len = cps_api_object_attr_len (attr_val);
     auto expected_size   = data_info.data_len;
 
-    if ((expected_size != 0) && (obj_data_type != NAS_ACL_DATA_IFNAME) &&
-        (expected_size != attr_len)) {
+    if ((expected_size != 0) && (expected_size < attr_len)) {
         throw nas::base_exception { NAS_ACL_E_ATTR_LEN, __PRETTY_FUNCTION__,
                 std::string {"Failed to extract "} + sub_obj_name
                 + ": Size mismatch for attribute " + std::to_string (data_info.attr_id)

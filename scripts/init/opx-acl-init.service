@@ -1,17 +1,14 @@
 [Unit]
 Description=Default ACL entries for Control Plane Protocol packets
-After=opx-create-interface.service
-Wants=opx-create-interface.service
-DefaultDependencies=no
+ConditionPathExists=!/etc/opx/base_acl_nocreate
+After=opx-cps.service
+Wants=opx-cps.service
+OnFailure=service_onfailure@%n.service
 
 [Service]
-Type=oneshot
+Type=notify
 EnvironmentFile=/etc/opx/opx-environment
-ExecStart=/usr/bin/base_acl_copp_svc.sh
-RemainAfterExit=yes
-
-# Resource Limitations
-LimitNOFILE=16384
+ExecStart=/usr/bin/python -u /usr/bin/base_create_acl_entries.py
 
 [Install]
 WantedBy=multi-user.target

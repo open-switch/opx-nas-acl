@@ -103,7 +103,7 @@ void nas_acl_entry::add_filter (nas_acl_filter_t& filter, bool reset)
     if (filter.is_npu_specific ()) {
         // Ensure that the entry has no other NPU specific filters.
         if (!_filter_npus.empty() &&
-             _flist.find(filter.filter_type()) == _flist.end()) {
+             _flist.find({filter.filter_type(), filter.filter_offset()}) == _flist.end()) {
             throw nas::base_exception {NAS_ACL_E_INCONSISTENT, __PRETTY_FUNCTION__,
                                        "Cannot have Port and Port-list Match filter in the same Entry."};
         }
@@ -122,18 +122,19 @@ void nas_acl_entry::add_filter (nas_acl_filter_t& filter, bool reset)
     }
 
     mark_attr_dirty (BASE_ACL_ENTRY_MATCH);
-    if (_flist.find (filter.filter_type()) != _flist.end()) {
-        _flist.at (filter.filter_type()) = filter;
+    if (_flist.find ({filter.filter_type(), filter.filter_offset()}) != _flist.end()) {
+        _flist.at ({filter.filter_type(), filter.filter_offset()}) = filter;
     } else {
-        _flist.insert (std::make_pair (filter.filter_type(), filter));
+        nas_acl_filter_key_t filter_key = {filter.filter_type(), filter.filter_offset()};
+        _flist.insert (std::make_pair (filter_key, filter));
     }
 }
 
-void nas_acl_entry::remove_filter (BASE_ACL_MATCH_TYPE_t ftype)
+void nas_acl_entry::remove_filter (BASE_ACL_MATCH_TYPE_t ftype, size_t offset)
 {
     if (nas_acl_filter_t::is_npu_specific (ftype))
         _filter_npus.clear();
-    _flist.erase (ftype);
+    _flist.erase ({ftype, offset});
     mark_attr_dirty (BASE_ACL_ENTRY_MATCH);
 }
 
@@ -269,11 +270,11 @@ nas::attr_set_t nas_acl_entry::commit_modify (base_obj_t& entry_orig,
     return nas::base_obj_t::commit_modify (entry_orig, rolling_back);
 }
 
-const nas_acl_filter_t& nas_acl_entry::get_filter (BASE_ACL_MATCH_TYPE_t
-                                                   ftype) const
+const nas_acl_filter_t& nas_acl_entry::get_filter (BASE_ACL_MATCH_TYPE_t ftype,
+                                                   size_t offset) const
 {
     try {
-        return _flist.at (ftype);
+        return _flist.at ({ftype, offset});
     } catch (std::out_of_range& ) {
         throw nas::base_exception {NAS_ACL_E_KEY_VAL, __PRETTY_FUNCTION__,
                               std::string {"ACL Entry has no Filter field "} +
@@ -327,15 +328,26 @@ ndi_acl_action_list_t nas_acl_entry::_copy_all_actions_ndi (npu_id_t npu_id,
 {
     ndi_acl_action_list_t ndi_alist;
 
+    bool found_trap_id_action = false;
     for (const_action_iter_t itr = _alist.begin(); itr != _alist.end(); ++itr) {
 
         auto& action = nas_acl_entry::get_action_from_itr (itr);
+        if (action.action_type() == BASE_ACL_ACTION_TYPE_SET_USER_TRAP_ID) {
+            found_trap_id_action = true;
+            continue;
+        }
         action.copy_action_ndi (ndi_alist, npu_id, mem_trakr);
 
         if (action.is_counter()) {
             _copy_ndi_counter_id (*this, ndi_alist.back(), npu_id);
         }
     }
+
+    if (found_trap_id_action) {
+        auto& action = _alist.at(BASE_ACL_ACTION_TYPE_SET_USER_TRAP_ID);
+        action.copy_action_ndi (ndi_alist, npu_id, mem_trakr);
+    }
+
     return ndi_alist;
 }
 
@@ -468,14 +480,16 @@ static void _utl_flist_compare (const nas_acl_entry::filter_list_t& lhs_flist,
          itr_old != rhs_flist.end(); ++itr_old) {
 
         const nas_acl_filter_t& f_old = nas_acl_entry::get_filter_from_itr (itr_old);
-        auto itr_new = lhs_flist.find (f_old.filter_type());
+        auto itr_new = lhs_flist.find ({f_old.filter_type(), f_old.filter_offset()});
 
         if (itr_new == lhs_flist.end()) {
-            deleted.insert (std::make_pair (f_old.filter_type(), f_old));
+            nas_acl_filter_key_t filter_key = {f_old.filter_type(), f_old.filter_offset()};
+            deleted.insert (std::make_pair (filter_key, f_old));
         } else {
             const nas_acl_filter_t& f_new = nas_acl_entry::get_filter_from_itr (itr_new);
             if (f_old != f_new) {
-                add_or_mod.insert (std::make_pair (f_new.filter_type(), f_new));
+                nas_acl_filter_key_t filter_key = {f_new.filter_type(), f_new.filter_offset()};
+                add_or_mod.insert (std::make_pair (filter_key, f_new));
             }
         }
     }
@@ -484,10 +498,11 @@ static void _utl_flist_compare (const nas_acl_entry::filter_list_t& lhs_flist,
          itr_new != lhs_flist.end(); ++itr_new) {
 
         const nas_acl_filter_t& f_new = nas_acl_entry::get_filter_from_itr (itr_new);
-        auto itr_old = rhs_flist.find (f_new.filter_type());
+        auto itr_old = rhs_flist.find ({f_new.filter_type(), f_new.filter_offset()});
 
         if (itr_old == rhs_flist.end()) {
-            add_or_mod.insert (std::make_pair (f_new.filter_type(), f_new));
+            nas_acl_filter_key_t filter_key = {f_new.filter_type(), f_new.filter_offset()};
+            add_or_mod.insert (std::make_pair (filter_key, f_new));
         }
     }
 }
@@ -851,8 +866,16 @@ void nas_acl_entry::rollback_delete_attr_in_npu (const nas::attr_list_t&
                 auto f_type = static_cast <BASE_ACL_MATCH_TYPE_t>
                     (attr_hierarchy[1]);
 
-                const nas_acl_filter_t& f = get_filter (f_type);
-                _utl_push_filter_to_npu (*this, f, npu_id);
+                if (f_type == BASE_ACL_MATCH_TYPE_UDF) {
+                    for (auto& f: _flist) {
+                        if (f.first.match_type == f_type) {
+                            _utl_push_filter_to_npu(*this, f.second, npu_id);
+                        }
+                    }
+                } else {
+                    const nas_acl_filter_t& f = get_filter (f_type, 0);
+                    _utl_push_filter_to_npu (*this, f, npu_id);
+                }
 
             } catch (nas::base_exception& e) {
                 NAS_ACL_LOG_ERR ("Rollback failed: NPU %d: %s ErrCode: %d \n",

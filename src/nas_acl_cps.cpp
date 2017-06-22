@@ -219,3 +219,176 @@ cps_api_object_attr_t nas_acl_get_attr (const cps_api_object_it_t& it,
     }
     return attr;
 }
+
+cps_api_return_code_t
+nas_udf_cps_api_read (void                 *context,
+                      cps_api_get_params_t *param,
+                      size_t                index)
+{
+    uint32_t              sub_category;
+    t_std_error rc = NAS_ACL_E_UNSUPPORTED;
+
+    cps_api_object_t filter_obj = cps_api_object_list_get (param->filters, index);
+
+    if (filter_obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Filter Object");
+        return cps_api_ret_code_ERR;
+    }
+
+    if (cps_api_key_get_cat (cps_api_object_key (filter_obj)) != cps_api_obj_CAT_BASE_UDF) {
+        NAS_ACL_LOG_ERR ("Invalid Category");
+        return cps_api_ret_code_ERR;
+    }
+
+    sub_category = cps_api_key_get_subcat (cps_api_object_key (filter_obj));
+
+    NAS_ACL_LOG_BRIEF("Sub Category: %d", sub_category);
+
+    nas_acl_lock ();
+
+    switch (sub_category) {
+
+        case BASE_UDF_UDF_GROUP_OBJ:
+            rc = nas_udf_get_group (param, index, filter_obj);
+            break;
+
+        case BASE_UDF_UDF_MATCH_OBJ:
+            rc = nas_udf_get_match (param, index, filter_obj);
+            break;
+
+        case BASE_UDF_UDF_OBJ_OBJ:
+            rc = nas_udf_get_udf (param, index, filter_obj);
+            break;
+
+        default:
+            break;
+    }
+
+    nas_acl_unlock ();
+
+    return static_cast <cps_api_return_code_t> (rc);
+}
+
+static t_std_error
+nas_udf_cps_api_write_internal (void                         *context,
+                                cps_api_transaction_params_t *param,
+                                cps_api_object_t             obj,
+                                cps_api_operation_types_t    op,
+                                bool                         rollback)
+{
+    if (cps_api_key_get_cat (cps_api_object_key (obj))
+        != cps_api_obj_CAT_BASE_UDF) {
+
+        NAS_ACL_LOG_BRIEF ("Invalid Category.");
+        return NAS_ACL_E_UNSUPPORTED;
+    }
+
+    cps_api_object_t prev = NULL;
+    if (!rollback) {
+        prev = cps_api_object_list_create_obj_and_append(param->prev);
+        if (prev == NULL) {
+            return NAS_ACL_E_MEM;
+        }
+    }
+
+    t_std_error rc = STD_ERR_OK;
+    uint32_t sub_category = cps_api_key_get_subcat (cps_api_object_key (obj));
+
+    NAS_ACL_LOG_BRIEF("Sub Category: %d", sub_category);
+
+    nas_acl_lock ();
+
+    switch (sub_category) {
+    case BASE_UDF_UDF_GROUP_OBJ:
+        switch(op) {
+        case cps_api_oper_CREATE:
+            rc = nas_udf_group_create(obj, prev, rollback);
+            break;
+        case cps_api_oper_DELETE:
+            rc = nas_udf_group_delete(obj, prev, rollback);
+            break;
+        default:
+            rc = NAS_ACL_E_UNSUPPORTED;
+            break;
+        }
+        break;
+    case BASE_UDF_UDF_MATCH_OBJ:
+        switch(op) {
+        case cps_api_oper_CREATE:
+            rc = nas_udf_match_create(obj, prev, rollback);
+            break;
+        case cps_api_oper_DELETE:
+            rc = nas_udf_match_delete(obj, prev, rollback);
+            break;
+        default:
+            rc = NAS_ACL_E_UNSUPPORTED;
+            break;
+        }
+        break;
+    case BASE_UDF_UDF_OBJ_OBJ:
+        switch(op) {
+        case cps_api_oper_CREATE:
+            rc = nas_udf_create(obj, prev, rollback);
+            break;
+        case cps_api_oper_DELETE:
+            rc = nas_udf_delete(obj, prev, rollback);
+            break;
+        default:
+            rc = NAS_ACL_E_UNSUPPORTED;
+            break;
+        }
+        break;
+    default:
+        rc = NAS_ACL_E_UNSUPPORTED;
+        break;
+    }
+
+    nas_acl_unlock ();
+
+    return rc;
+}
+
+cps_api_return_code_t
+nas_udf_cps_api_write (void                         *context,
+                       cps_api_transaction_params_t *param,
+                       size_t                        index)
+{
+    cps_api_object_t          obj;
+    cps_api_operation_types_t op;
+
+    obj = cps_api_object_list_get (param->change_list, index);
+
+    if (obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Change Object");
+        return cps_api_ret_code_ERR;
+    }
+
+    op = cps_api_object_type_operation (cps_api_object_key (obj));
+
+    auto rc = nas_udf_cps_api_write_internal (context, param, obj, op, false);
+    return static_cast<cps_api_return_code_t>(rc);
+}
+
+cps_api_return_code_t
+nas_udf_cps_api_rollback (void                         *context,
+                          cps_api_transaction_params_t *param,
+                          size_t                        index)
+{
+    cps_api_object_t          obj;
+    cps_api_operation_types_t op;
+
+    obj = cps_api_object_list_get (param->prev, index);
+
+    if (obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Previous saved Object");
+        return cps_api_ret_code_ERR;
+    }
+
+    op = cps_api_object_type_operation (cps_api_object_key (obj));
+
+    op = ((op == cps_api_oper_CREATE) ? cps_api_oper_DELETE :
+          (op == cps_api_oper_DELETE) ? cps_api_oper_CREATE : op);
+
+    auto rc = nas_udf_cps_api_write_internal (context, param, obj, op, true);
+    return static_cast<cps_api_return_code_t>(rc);
+}

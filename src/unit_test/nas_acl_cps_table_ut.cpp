@@ -18,10 +18,6 @@
 #include "cps_api_object_key.h"
 #include "cps_class_map.h"
 
-extern "C" {
-#include "sai_shell.h"
-}
-
 /*** NAS ACL Main Control block ***/
 nas_acl_ut_table_t g_nas_acl_ut_tables [NAS_ACL_UT_MAX_TABLES];
 

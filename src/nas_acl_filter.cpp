@@ -32,7 +32,8 @@
 #include <unordered_map>
 #include <arpa/inet.h>
 
-nas_acl_filter_t::nas_acl_filter_t (BASE_ACL_MATCH_TYPE_t t)
+nas_acl_filter_t::nas_acl_filter_t (const nas_acl_table* table, BASE_ACL_MATCH_TYPE_t t)
+    : _table_p(table)
 {
     if (!is_type_valid (t)) {
         throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
@@ -345,6 +346,53 @@ void nas_acl_filter_t::set_filter_ifindex (const nas_acl_common_data_list_t& val
     }
 }
 
+void nas_acl_filter_t::get_udf_filter_val(nas_acl_common_data_list_t& val_list) const
+{
+    nas_acl_common_data_t udf_group_id {};
+    nas_acl_common_data_t udf_match_data {};
+    nas_acl_common_data_t udf_match_mask {};
+    size_t byte_count;
+    uint8_t *byte_list;
+
+    udf_group_id.obj_id = get_udf_group_from_pos(_f_info.udf_seq_no);
+
+    byte_count = _f_info.data.values.ndi_u8list.byte_count;
+    byte_list = _f_info.data.values.ndi_u8list.byte_list;
+    auto& bytes = udf_match_data.bytes;
+    bytes.insert(bytes.begin(), byte_list, byte_list + byte_count);
+    byte_count = _f_info.mask.values.ndi_u8list.byte_count;
+    byte_list = _f_info.mask.values.ndi_u8list.byte_list;
+    auto& bytes_mask = udf_match_mask.bytes;
+    bytes_mask.insert(bytes_mask.begin(), byte_list, byte_list + byte_count);
+
+    val_list.push_back(udf_group_id);
+    val_list.push_back(udf_match_data);
+    val_list.push_back(udf_match_mask);
+}
+
+void nas_acl_filter_t::set_udf_filter_val(const nas_acl_common_data_list_t& val_list)
+{
+    size_t byte_cnt;
+    uint8_t *byte_buf;
+
+    _f_info.values_type = NDI_ACL_FILTER_U8LIST;
+    _f_info.udf_seq_no = get_udf_group_pos(val_list[0].obj_id);
+    byte_cnt = val_list[1].bytes.size();
+    byte_buf = (uint8_t *)calloc(byte_cnt, 1);
+    if (byte_buf != NULL) {
+        memcpy(byte_buf, val_list[1].bytes.data(), byte_cnt);
+        _f_info.data.values.ndi_u8list.byte_count = byte_cnt;
+        _f_info.data.values.ndi_u8list.byte_list = byte_buf;
+    }
+    byte_cnt = val_list[2].bytes.size();
+    byte_buf = (uint8_t *)calloc(byte_cnt, 1);
+    if (byte_buf != NULL) {
+        memcpy(byte_buf, val_list[2].bytes.data(), byte_cnt);
+        _f_info.mask.values.ndi_u8list.byte_count = byte_cnt;
+        _f_info.mask.values.ndi_u8list.byte_list = byte_buf;
+    }
+}
+
 bool nas_acl_filter_t::_ndi_copy_one_obj_id(ndi_acl_entry_filter_t* ndi_filter_p,
                                             npu_id_t npu_id) const
 {
@@ -529,8 +577,51 @@ void nas_acl_filter_t::dbg_dump () const
             NAS_ACL_LOG_DUMP ("  U8 Mask = %d", _f_info.mask.values.u8);
             break;
 
+        case NDI_ACL_FILTER_U8LIST:
+            NAS_ACL_LOG_DUMP("   U8 List Value Count = %d",
+                             _f_info.data.values.ndi_u8list.byte_count);
+            NAS_ACL_LOG_DUMP("   U8 List Value =");
+            for (size_t idx = 0; idx < _f_info.data.values.ndi_u8list.byte_count; idx ++) {
+                NAS_ACL_LOG_DUMP("%d, ", _f_info.data.values.ndi_u8list.byte_list[idx]);
+            }
+            NAS_ACL_LOG_DUMP("");
+            NAS_ACL_LOG_DUMP("   U8 List Mask Count = %d",
+                             _f_info.mask.values.ndi_u8list.byte_count);
+            NAS_ACL_LOG_DUMP("   U8 List Mask =");
+            for (size_t idx = 0; idx < _f_info.mask.values.ndi_u8list.byte_count; idx ++) {
+                NAS_ACL_LOG_DUMP("%d, ", _f_info.mask.values.ndi_u8list.byte_list[idx]);
+            }
+            NAS_ACL_LOG_DUMP("");
+            break;
+
         default:
             break;
     }
 }
 
+nas_obj_id_t nas_acl_filter_t::get_udf_group_from_pos(size_t udf_grp_pos) const
+{
+    if (_table_p == nullptr) {
+        throw nas::base_exception {NAS_ACL_E_FAIL, __PRETTY_FUNCTION__,
+            "ACL Table member was not initiated"};
+    }
+    return _table_p->udf_group_list().at(udf_grp_pos);
+}
+
+size_t nas_acl_filter_t::get_udf_group_pos(nas_obj_id_t udf_grp_id) const
+{
+    if (_table_p == nullptr) {
+        throw nas::base_exception {NAS_ACL_E_FAIL, __PRETTY_FUNCTION__,
+            "ACL Table member was not initiated"};
+    }
+    size_t idx = 0;
+    for (auto grp_id: _table_p->udf_group_list()) {
+        if (grp_id == udf_grp_id) {
+            return idx;
+        }
+        idx ++;
+    }
+
+    throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
+        std::string {"Invalid UDF Group ID "} + std::to_string (udf_grp_id)};
+}

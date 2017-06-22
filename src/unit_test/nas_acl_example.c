@@ -142,3 +142,7 @@ void main ()
         printf ("Entry Creation failed\r\n");
     }
 }
+
+/*
+gcc src/unit_test/nas_acl_example.c -I ../workspace/debian/jessie/x86_64/sysroot/usr/include/ngos/ -L ../workspace/debian/jessie/x86_64/sysroot/opt/dell/os10/lib/ -l cps-api-common
+ */

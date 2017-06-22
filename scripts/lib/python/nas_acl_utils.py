@@ -128,20 +128,18 @@ def qos_meter_get_opaque_data(meter_id):
 
 
 def qos_queue_get(ifidx, q_num, q_type):
-    flt = nas_qos.QueueCPSObj(
-        queue_type=q_type,
-        queue_number=q_num,
-        port_id=ifidx)
+    attr_list = {
+        'type': q_type,
+        'queue-number': q_num,
+        'port-id': ifidx,
+    }
+    flt = nas_qos.QueueCPSObj(map_of_attr = attr_list)
     ret = []
     r = cps.get([flt.data()], ret)
     if r == False:
         raise RuntimeError("Queue Get failed")
 
-    q = nas_qos.QueueCPSObj(
-        queue_type=q_type,
-        queue_number=q_num,
-        port_id=ifidx,
-        cps_data=ret[0])
+    q = nas_qos.QueueCPSObj(cps_data=ret[0])
 
     return q.extract_id(), q.extract_opaque_data()
 

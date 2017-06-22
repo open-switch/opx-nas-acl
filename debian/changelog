@@ -1,3 +1,10 @@
+opx-nas-acl (1.3.1) unstable; urgency=medium
+
+  * Update: Added support for ACL user defined filter (UDF) configuration and ACL action to set user trap ID
+  * Update: Added FC as valid port type that is supported by ifindex to physical port conversion
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Wed, 21 June 2017  20:45:36 -0700
+
 opx-nas-acl (1.0.1) unstable; urgency=medium
 
   * Initial release.

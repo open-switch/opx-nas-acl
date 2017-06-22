@@ -37,10 +37,52 @@
 class nas_acl_switch;
 class nas_acl_table;
 
+typedef struct _nas_acl_filter_key_t
+{
+    BASE_ACL_MATCH_TYPE_t match_type;
+    size_t offset;
+} nas_acl_filter_key_t;
+
+struct _filter_key_hash
+{
+    size_t operator()(const nas_acl_filter_key_t&key) const {
+        size_t hash;
+        if (key.match_type == BASE_ACL_MATCH_TYPE_UDF) {
+            hash = std::hash<int>()(key.match_type);
+            hash ^= (std::hash<int>()(key.offset) << 1);
+        } else {
+            hash = std::hash<int>()(key.match_type);
+        }
+        return hash;
+    }
+};
+
+struct _filter_key_equal
+{
+    bool operator()(const nas_acl_filter_key_t& k1, const nas_acl_filter_key_t& k2) const
+    {
+        if (k1.match_type != k2.match_type) {
+            return false;
+        }
+        if (k1.match_type == BASE_ACL_MATCH_TYPE_UDF &&
+            k1.offset != k2.offset) {
+            return false;
+        }
+
+        return true;
+    }
+};
+
+static inline bool operator==(const nas_acl_filter_key_t& k1, const nas_acl_filter_key_t& k2)
+{
+    return _filter_key_equal()(k1, k2);
+}
+
 class nas_acl_entry final : public nas::base_obj_t
 {
     public:
-        typedef std::unordered_map<BASE_ACL_MATCH_TYPE_t, nas_acl_filter_t, std::hash<int>> filter_list_t;
+        typedef std::unordered_map<nas_acl_filter_key_t, nas_acl_filter_t, _filter_key_hash, _filter_key_equal>
+            filter_list_t;
         typedef filter_list_t::iterator  filter_iter_t;
         typedef filter_list_t::const_iterator  const_filter_iter_t;
 
@@ -59,7 +101,7 @@ class nas_acl_entry final : public nas::base_obj_t
         nas_obj_id_t             entry_id() const  noexcept {return _entry_id;}
         ndi_acl_priority_t       priority() const  noexcept {return _priority;}
 
-        const nas_acl_filter_t&   get_filter (BASE_ACL_MATCH_TYPE_t ftype) const;
+        const nas_acl_filter_t&   get_filter (BASE_ACL_MATCH_TYPE_t ftype, size_t offset) const;
         const filter_list_t&      get_filter_list () const noexcept {return _flist;}
         const nas_acl_action_t&   get_action (BASE_ACL_ACTION_TYPE_t atype) const;
         const action_list_t&      get_action_list () const noexcept {return _alist;}
@@ -82,7 +124,7 @@ class nas_acl_entry final : public nas::base_obj_t
         void set_priority (ndi_acl_priority_t p);
         void add_filter (nas_acl_filter_t& filter, bool reset=true);
         void add_action (nas_acl_action_t& action, bool reset=true);
-        void remove_filter (BASE_ACL_MATCH_TYPE_t ftype);
+        void remove_filter (BASE_ACL_MATCH_TYPE_t ftype, size_t offset);
         void remove_action (BASE_ACL_ACTION_TYPE_t atype);
         void reset_filter ();
         void reset_action ();

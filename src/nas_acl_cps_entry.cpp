@@ -279,7 +279,7 @@ static t_std_error _cps_fill_match_info (cps_api_get_params_t *param,
     nas::attr_list_t  attr_id_list;
     attr_id_list.reserve (NAS_ACL_MAX_ATTR_DEPTH);
 
-    if (!nas_acl_fill_match_attr (obj, entry.get_filter(ftype),
+    if (!nas_acl_fill_match_attr (obj, entry.get_filter(ftype, 0),
                                   ftype, attr_id_list))
     {
         return NAS_ACL_E_MEM;
@@ -453,6 +453,10 @@ static entry_op_key_t _cps_op_key_extract (cps_api_object_t obj)
 
     if (key.has_entry_id) {
         if (key.has_match_type) {
+             if (key.ftype == BASE_ACL_MATCH_TYPE_UDF) {
+                 throw nas::base_exception {NAS_ACL_E_UNSUPPORTED, __PRETTY_FUNCTION__,
+                                "Modification on UDF filter is not supported"};
+             }
              return {s,t,true, key.entry_id, true,{true, (uint32_t)(key.ftype)}};
         }
         if (key.has_action_type) {
@@ -487,10 +491,10 @@ static void  _cps_entry_incr_upd (cps_api_object_t       obj,
                             nas_acl_filter_t::type_name (ftype));
 
         if (op != cps_api_oper_CREATE) {
-            filter_p = &(old_entry.get_filter (ftype));
+            filter_p = &(old_entry.get_filter (ftype, 0));
         }
         if (op == cps_api_oper_DELETE) {
-            new_entry.remove_filter(ftype);
+            new_entry.remove_filter(ftype, filter_p->filter_offset());
         } else {
             // Attr-list to build single Filter attr hierarchy -
             //   - Match-Value-Attr . Match-Value-Child-Attr

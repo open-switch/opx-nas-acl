@@ -18,6 +18,7 @@
 #include "ds_common_types.h"
 #include "hal_if_mapping.h"
 #include "nas_ndi_acl.h"
+#include "nas_ndi_udf.h"
 #include "std_error_codes.h"
 #include "nas_acl_cps_ut.h"
 #include "nas_acl_db_ut.h"
@@ -286,4 +287,43 @@ void intf_init (npu_id_t num_npus, npu_port_t num_ports)
         }
     }
     dn_hal_dump_interface_mapping ();
+}
+
+t_std_error ndi_udf_group_create(npu_id_t npu_id, const ndi_udf_grp_t *udf_grp_p,
+                                 ndi_obj_id_t *udf_grp_id_p)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_udf_group_delete(npu_id_t npu_id, ndi_obj_id_t udf_grp_id)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_udf_match_create(npu_id_t npu_id, const ndi_udf_match_t *udf_match_p,
+                                 ndi_obj_id_t *udf_match_id_p)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_udf_match_delete(npu_id_t npu_id, ndi_obj_id_t udf_match_id)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_udf_create(npu_id_t npu_id, const ndi_udf_t *udf_p,
+                           ndi_obj_id_t *udf_id_p)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_udf_delete(npu_id_t npu_id, ndi_obj_id_t udf_id)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_udf_set_hash_mask(npu_id_t npu_id, ndi_obj_id_t udf_id,
+                                  uint8_t *hash_mask_list, size_t hash_mask_count)
+{
+    return STD_ERR_OK;
 }

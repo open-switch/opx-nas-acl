@@ -210,4 +210,37 @@ int nas_acl_lock () noexcept;
 
 int nas_acl_unlock () noexcept;
 
+t_std_error           nas_udf_get_group (cps_api_get_params_t *param, size_t index,
+                                         cps_api_object_t filter_obj) noexcept;
+
+t_std_error           nas_udf_get_match (cps_api_get_params_t *param, size_t index,
+                                         cps_api_object_t filter_obj) noexcept;
+
+t_std_error           nas_udf_get_udf (cps_api_get_params_t *param, size_t index,
+                                       cps_api_object_t filter_obj) noexcept;
+
+t_std_error           nas_udf_group_create(cps_api_object_t obj,
+                                           cps_api_object_t prev,
+                                           bool is_rollbk) noexcept;
+
+t_std_error           nas_udf_group_delete(cps_api_object_t obj,
+                                           cps_api_object_t prev,
+                                           bool is_rollbk) noexcept;
+
+t_std_error           nas_udf_match_create(cps_api_object_t obj,
+                                           cps_api_object_t prev,
+                                           bool is_rollbk) noexcept;
+
+t_std_error           nas_udf_match_delete(cps_api_object_t obj,
+                                           cps_api_object_t prev,
+                                           bool is_rollbk) noexcept;
+
+t_std_error           nas_udf_create(cps_api_object_t obj,
+                                     cps_api_object_t prev,
+                                     bool is_rollbk) noexcept;
+
+t_std_error           nas_udf_delete(cps_api_object_t obj,
+                                     cps_api_object_t prev,
+                                     bool is_rollbk) noexcept;
+
 #endif

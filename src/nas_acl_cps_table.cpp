@@ -98,6 +98,25 @@ nas_acl_fill_table_allowed_fields (cps_api_object_t obj, const nas_acl_table& ta
     return true;
 }
 
+static inline bool
+nas_acl_fill_table_udf_group_list (cps_api_object_t obj, const nas_acl_table& table) noexcept
+{
+    if (obj == nullptr) {
+        NAS_ACL_LOG_ERR ("Invalid input argument");
+        return false;
+    }
+
+    for (auto grp_id: table.udf_group_list ()) {
+        if (!cps_api_object_attr_add_u64 (obj,
+                                          BASE_ACL_TABLE_UDF_GROUP_LIST,
+                                          grp_id)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static bool
 nas_acl_fill_table_attr_info (cps_api_object_t obj, const nas_acl_table& table,
                               bool explicit_npu_list=false) noexcept
@@ -118,6 +137,10 @@ nas_acl_fill_table_attr_info (cps_api_object_t obj, const nas_acl_table& table,
     }
 
     if (!nas_acl_fill_table_allowed_fields (obj, table)) {
+        return false;
+    }
+
+    if (!nas_acl_fill_table_udf_group_list(obj, table)) {
         return false;
     }
 
@@ -344,6 +367,14 @@ t_std_error nas_acl_table_create (cps_api_object_t obj,
 
                     tmp_table.set_allowed_filter (match_field);
                     break;
+
+                case BASE_ACL_TABLE_UDF_GROUP_LIST:
+                {
+                    nas_obj_id_t udf_grp_id = cps_api_object_attr_data_u64(it.attr);
+                    NAS_ACL_LOG_DETAIL ("UDF Group ID: %lu", udf_grp_id);
+                    tmp_table.set_udf_group_id(udf_grp_id);
+                    break;
+                }
 
                 case BASE_ACL_TABLE_NPU_ID_LIST:
                     // Must not check for duplicate attributes, since

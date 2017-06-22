@@ -50,6 +50,7 @@ class nas_acl_table final : public nas::base_obj_t
 {
     public:
         typedef std::set<BASE_ACL_MATCH_TYPE_t> filter_set_t;
+        typedef std::vector<nas_obj_id_t> udf_group_list_t;
 
         ////// Constructor/Destructor /////
         nas_acl_table (nas_acl_switch* switch_p);
@@ -67,6 +68,9 @@ class nas_acl_table final : public nas::base_obj_t
                    // Copy filter-set to c style array
         void       allowed_filters_c_cpy (size_t filter_count,
                                           BASE_ACL_MATCH_TYPE_t* filter_list) const noexcept;
+        bool         is_udf_group_in_list(nas_obj_id_t udf_grp_id) const noexcept;
+        size_t       udf_group_list_count() const noexcept {return _udf_group_list.size();}
+        const udf_group_list_t& udf_group_list() const noexcept {return _udf_group_list;}
         ndi_obj_id_t  get_ndi_obj_id (npu_id_t  npu_id) const;
 
         //////// Modifiers ////////
@@ -75,6 +79,7 @@ class nas_acl_table final : public nas::base_obj_t
         void set_table_size(uint_t size);
         void set_priority (ndi_acl_priority_t p);
         void set_allowed_filter (uint_t filter_id);
+        void set_udf_group_id (nas_obj_id_t udf_grp_id);
 
         // Override all base class routines that handle NPU change request
         // to disallow change when table has entries
@@ -106,6 +111,7 @@ class nas_acl_table final : public nas::base_obj_t
         BASE_ACL_STAGE_t   _stage = BASE_ACL_STAGE_INGRESS;
         filter_set_t       _allowed_filters;
         uint_t             _size = 0;
+        udf_group_list_t   _udf_group_list;
 
         // Read-write attributes
         ndi_acl_priority_t    _priority = 0;

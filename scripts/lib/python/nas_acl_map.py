@@ -16,6 +16,7 @@
 table_attr_map = {
     'switch-id': ('leaf', 'uint32_t'),
     'id': ('leaf', 'uint64_t'),
+    'size': ('leaf', 'uint32_t'),
     'stage': ('leaf', 'enum', 'base-acl:stage:'),
     'priority': ('leaf', 'uint32_t'),
     'allowed-match-fields': ('leaflist', 'enum', 'base-acl:match-type:'),

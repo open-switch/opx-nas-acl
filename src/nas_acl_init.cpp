@@ -24,6 +24,7 @@
 #include "nas_acl_log.h"
 #include "std_error_codes.h"
 #include "nas_acl_cps.h"
+#include "nas_udf_cps.h"
 #include "nas_acl_init.h"
 #include "std_mutex_lock.h"
 
@@ -67,6 +68,30 @@ static t_std_error _cps_init ()
         NAS_ACL_LOG_ERR ("NAS ACL CPS object Register failed");
         return STD_ERR(QOS, FAIL, rc);
     }
+
+    memset (&f, 0, sizeof(f));
+
+    f.handle             = handle;
+    f._read_function     = nas_udf_cps_api_read;
+    f._write_function    = nas_udf_cps_api_write;
+    f._rollback_function = nas_udf_cps_api_rollback;
+
+    /*
+     * Register all UDF objects
+     */
+    cps_api_key_init (&f.key,
+                      cps_api_qualifier_TARGET,
+                      cps_api_obj_CAT_BASE_UDF,
+                      0, /* register all sub-categories */
+                      0);
+
+    rc = cps_api_register (&f);
+
+    if (rc != cps_api_ret_code_OK) {
+        NAS_ACL_LOG_ERR ("NAS UDF CPS object Register failed");
+        return STD_ERR(QOS, FAIL, rc);
+    }
+
 
     return STD_ERR_OK;
 }

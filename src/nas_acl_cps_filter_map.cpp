@@ -24,6 +24,7 @@
 #include "nas_vlan_consts.h"
 #include "nas_qos_consts.h"
 #include "nas_acl_common.h"
+#include "nas_acl_udf.h"
 
 static const nas_acl_filter_map_t _filter_map =
 {
@@ -968,6 +969,42 @@ static const nas_acl_filter_map_t _filter_map =
             {},
             &nas_acl_filter_t::get_filter_ifindex,
             &nas_acl_filter_t::set_filter_ifindex,
+        },
+    },
+
+    {BASE_ACL_MATCH_TYPE_UDF,
+        {
+            "MATCH_TYPE_UDF",
+            {
+                BASE_ACL_ENTRY_MATCH_UDF_VALUE,
+                NAS_ACL_DATA_EMBEDDED,
+                {},
+            },
+            {
+                {
+                    BASE_ACL_ENTRY_MATCH_UDF_VALUE_UDF_GROUP_ID,
+                    NAS_ACL_DATA_OBJ_ID,
+                    sizeof(nas_obj_id_t),
+                    NAS_ACL_ATTR_MODE_MANDATORY,
+                    {},
+                },
+                {
+                    BASE_ACL_ENTRY_MATCH_UDF_VALUE_MATCH_DATA,
+                    NAS_ACL_DATA_BIN,
+                    MAX_UDF_BYTE_ARRAY_LENGTH,
+                    NAS_ACL_ATTR_MODE_MANDATORY,
+                    {},
+                },
+                {
+                    BASE_ACL_ENTRY_MATCH_UDF_VALUE_MATCH_MASK,
+                    NAS_ACL_DATA_BIN,
+                    MAX_UDF_BYTE_ARRAY_LENGTH,
+                    NAS_ACL_ATTR_MODE_OPTIONAL,
+                    {},
+                },
+            },
+            &nas_acl_filter_t::get_udf_filter_val,
+            &nas_acl_filter_t::set_udf_filter_val,
         },
     },
 };

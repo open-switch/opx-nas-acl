@@ -51,7 +51,7 @@ void nas_acl_set_match_attr (const cps_api_object_t     obj,
     }
 
     const nas_acl_filter_info_t& map_info = map_kv->second;
-    nas_acl_filter_t filter {match_type_val};
+    nas_acl_filter_t filter {&entry.get_table(), match_type_val};
 
     if (map_info.val.data_type != NAS_ACL_DATA_NONE) {
 

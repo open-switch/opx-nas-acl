@@ -575,6 +575,22 @@ static const nas_acl_action_map_t _action_map =
             &nas_acl_action_t::set_action_ifindex_list,
         },
     },
+
+    {BASE_ACL_ACTION_TYPE_SET_USER_TRAP_ID,
+        {
+            "ACTION_TYPE_SET_USER_TRAP_ID",
+            {
+                BASE_ACL_ENTRY_ACTION_SET_USER_TRAP_ID_VALUE,
+                NAS_ACL_DATA_U32,
+                sizeof (uint32_t),
+                NAS_ACL_ATTR_MODE_MANDATORY,
+                {},
+            },
+            {},
+            &nas_acl_action_t::get_u32_action_val,
+            &nas_acl_action_t::set_u32_action_val,
+        },
+    },
 };
 
 const char* nas_acl_action_type_name (BASE_ACL_ACTION_TYPE_t type) noexcept

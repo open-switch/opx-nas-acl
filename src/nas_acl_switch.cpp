@@ -306,3 +306,87 @@ nas_acl_counter_t&  nas_acl_switch::save_counter (nas_acl_counter_t&& tmp_cntr) 
 
     return (it->second = std::move(tmp_cntr));
 }
+
+nas_udf_group* nas_acl_switch::find_udf_group (nas_obj_id_t udf_grp_id) noexcept
+{
+    auto udf_grp = _udf_groups.find (udf_grp_id);
+    if (udf_grp == _udf_groups.end ()) {
+        return nullptr;
+    }
+
+    return &udf_grp->second;
+}
+
+nas_udf_match* nas_acl_switch::find_udf_match (nas_obj_id_t udf_match_id) noexcept
+{
+    auto udf_match = _udf_matches.find (udf_match_id);
+    if (udf_match == _udf_matches.end ()) {
+        return nullptr;
+    }
+
+    return &udf_match->second;
+}
+
+nas_udf* nas_acl_switch::find_udf (nas_obj_id_t udf_id) noexcept
+{
+    auto udf_itr = _udf_objs.find (udf_id);
+    if (udf_itr == _udf_objs.end ()) {
+        return nullptr;
+    }
+
+    return &udf_itr->second;
+}
+
+nas_udf_group& nas_acl_switch::save_udf_group(nas_udf_group&& udf_grp) noexcept
+{
+    auto it = _udf_groups.find(udf_grp.group_id());
+
+    if (it == _udf_groups.end()) {
+        auto p = _udf_groups.insert(std::make_pair(udf_grp.group_id(), std::move(udf_grp)));
+        return (p.first->second);
+    }
+
+    // Update existing UDF group if present
+    return (it->second = std::move(udf_grp));
+}
+
+void nas_acl_switch::remove_udf_group(nas_obj_id_t group_id) noexcept
+{
+    _udf_groups.erase(group_id);
+}
+
+nas_udf_match& nas_acl_switch::save_udf_match(nas_udf_match&& udf_match) noexcept
+{
+    auto it = _udf_matches.find(udf_match.match_id());
+
+    if (it == _udf_matches.end()) {
+        auto p = _udf_matches.insert(std::make_pair(udf_match.match_id(), std::move(udf_match)));
+        return (p.first->second);
+    }
+
+    // Update existing UDF match if present
+    return (it->second = std::move(udf_match));
+}
+
+void nas_acl_switch::remove_udf_match(nas_obj_id_t match_id) noexcept
+{
+    _udf_matches.erase(match_id);
+}
+
+nas_udf& nas_acl_switch::save_udf(nas_udf&& udf) noexcept
+{
+    auto it = _udf_objs.find(udf.udf_id());
+
+    if (it == _udf_objs.end()) {
+        auto p = _udf_objs.insert(std::make_pair(udf.udf_id(), std::move(udf)));
+        return (p.first->second);
+    }
+
+    // Update existing UDF if present
+    return (it->second = std::move(udf));
+}
+
+void nas_acl_switch::remove_udf(nas_obj_id_t udf_id) noexcept
+{
+    _udf_objs.erase(udf_id);
+}

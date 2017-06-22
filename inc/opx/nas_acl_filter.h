@@ -28,10 +28,10 @@
 #include "nas_base_utils.h"
 #include "nas_ndi_acl.h"
 #include "nas_acl_common.h"
+#include "nas_acl_table.h"
 #include <string.h>
 #include <vector>
 #include <unordered_map>
-
 
 class nas_acl_filter_t
 {
@@ -54,9 +54,10 @@ class nas_acl_filter_t
         const char* name () const noexcept;
         void dbg_dump () const;
 
-        nas_acl_filter_t (BASE_ACL_MATCH_TYPE_t t);
+        nas_acl_filter_t (const nas_acl_table* table, BASE_ACL_MATCH_TYPE_t t);
 
         BASE_ACL_MATCH_TYPE_t filter_type () const noexcept {return _f_info.filter_type;}
+        size_t filter_offset () const noexcept {return _f_info.udf_seq_no;}
         bool is_npu_specific () const noexcept;
 
         void get_u8_filter_val (nas_acl_common_data_list_t& val_list) const;
@@ -73,6 +74,7 @@ class nas_acl_filter_t
         void get_ip_frag_filter_val (nas_acl_common_data_list_t& val_list) const;
         void get_filter_ifindex_list (nas_acl_common_data_list_t& val_list) const;
         void get_filter_ifindex (nas_acl_common_data_list_t& val_list) const;
+        void get_udf_filter_val (nas_acl_common_data_list_t& val_list) const;
 
         const nas::ifindex_list_t& get_filter_if_list () const noexcept;
         nas::npu_set_t get_npu_list () const;
@@ -91,6 +93,10 @@ class nas_acl_filter_t
         void set_ip_frag_filter_val (const nas_acl_common_data_list_t& val_list);
         void set_filter_ifindex_list (const nas_acl_common_data_list_t& val_list);
         void set_filter_ifindex (const nas_acl_common_data_list_t& val_list);
+        void set_udf_filter_val (const nas_acl_common_data_list_t& val_list);
+
+        nas_obj_id_t get_udf_group_from_pos(size_t udf_grp_pos) const;
+        size_t get_udf_group_pos(nas_obj_id_t udf_grp_id) const;
 
         bool copy_filter_ndi (ndi_acl_entry_filter_t* ndi_filter_p,
                               npu_id_t npu_id, nas::mem_alloc_helper_t& m) const;
@@ -110,6 +116,8 @@ class nas_acl_filter_t
         std::unordered_map<nas_obj_id_t, nas::ndi_obj_id_table_t>  _nas2ndi_oid_tbl;
         ndi_acl_entry_filter_t   _f_info;
         nas::ifindex_list_t   _ifindex_list;
+
+        const nas_acl_table* _table_p = nullptr;
 };
 
 inline const nas::ifindex_list_t&

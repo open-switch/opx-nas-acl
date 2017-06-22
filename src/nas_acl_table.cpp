@@ -82,6 +82,15 @@ void nas_acl_table::commit_create (bool rolling_back)
     }
 
     nas::base_obj_t::commit_create(rolling_back);
+
+    if (is_attr_dirty(BASE_ACL_TABLE_UDF_GROUP_LIST)) {
+        for (auto grp_id: _udf_group_list) {
+            nas_udf_group* grp_p = get_switch().find_udf_group(grp_id);
+            if (grp_p != nullptr) {
+                grp_p->inc_acl_ref_count();
+            }
+        }
+    }
 }
 
 void nas_acl_table::commit_delete (bool rolling_back)
@@ -101,6 +110,15 @@ void nas_acl_table::commit_delete (bool rolling_back)
     }
 
     nas::base_obj_t::commit_delete(rolling_back);
+
+    if (_udf_group_list.size() > 0) {
+        for (auto grp_id: _udf_group_list) {
+            nas_udf_group* grp_p = get_switch().find_udf_group(grp_id);
+            if (grp_p != nullptr) {
+                grp_p->dec_acl_ref_count();
+            }
+        }
+    }
 }
 
 void nas_acl_table::set_priority (uint_t p)
@@ -189,6 +207,34 @@ void nas_acl_table::allowed_filters_c_cpy (size_t filter_count,
     STD_ASSERT (count <= filter_count);
 }
 
+bool nas_acl_table::is_udf_group_in_list(nas_obj_id_t udf_grp_id) const noexcept
+{
+    for (auto id: _udf_group_list) {
+        if (id == udf_grp_id) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void nas_acl_table::set_udf_group_id(nas_obj_id_t udf_grp_id)
+{
+    if (is_created_in_ndi()) {
+        // Create-Only attribute
+        throw nas::base_exception {NAS_ACL_E_CREATE_ONLY, __PRETTY_FUNCTION__,
+                                   "Cannot modify UDF Group list for Table"};
+    }
+
+    if (!is_attr_dirty(BASE_ACL_TABLE_UDF_GROUP_LIST)) {
+        mark_attr_dirty(BASE_ACL_TABLE_UDF_GROUP_LIST);
+        _udf_group_list.clear();
+    }
+
+    if (!is_udf_group_in_list(udf_grp_id)) {
+        _udf_group_list.push_back(udf_grp_id);
+    }
+}
 
 void* nas_acl_table::alloc_fill_ndi_obj (nas::mem_alloc_helper_t& mem_trakr)
 {
@@ -214,6 +260,22 @@ bool nas_acl_table::push_create_obj_to_npu (npu_id_t npu_id,
     t_std_error rc;
 
     auto ndi_tbl_p = static_cast<ndi_acl_table_t*> (ndi_obj);
+
+    std::vector<ndi_obj_id_t> npu_grp_id_list;
+    if (_udf_group_list.size() > 0) {
+        ndi_tbl_p->udf_grp_count = _udf_group_list.size();
+        for (auto grp_id: _udf_group_list) {
+            nas_udf_group* udf_grp_p = get_switch().find_udf_group(grp_id);
+            if (udf_grp_p == nullptr) {
+                throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
+                                std::string{"Invalid UDF Group ID "} +
+                                std::to_string(grp_id)};
+            }
+            ndi_obj_id_t npu_grp_id = udf_grp_p->get_ndi_obj_id(npu_id);
+            npu_grp_id_list.push_back(npu_grp_id);
+        }
+        ndi_tbl_p->udf_grp_id_list = npu_grp_id_list.data();
+    }
 
     if ((rc = ndi_acl_table_create (npu_id, ndi_tbl_p, &ndi_tbl_id))
             != STD_ERR_OK)
