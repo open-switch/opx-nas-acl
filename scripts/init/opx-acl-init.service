@@ -1,12 +1,9 @@
 [Unit]
 Description=Default ACL entries for Control Plane Protocol packets
-ConditionPathExists=!/etc/opx/base_acl_nocreate
 After=opx-cps.service
 Wants=opx-cps.service
-OnFailure=service_onfailure@%n.service
 
 [Service]
-Type=notify
 EnvironmentFile=/etc/opx/opx-environment
 ExecStart=/usr/bin/python -u /usr/bin/base_create_acl_entries.py
 
