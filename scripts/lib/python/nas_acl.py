@@ -39,11 +39,117 @@ from nas_acl_stats import *
 import cps
 import cps_utils
 
-def create_table(stage, prio, allow_filters, switch_id=0):
-    t = TableCPSObj(stage=stage, priority=prio, switch_id=switch_id)
+def find_table(table_id=None,priority=None,matchfields=None,table_stage=None):
+    t = TableCPSObj(table_id=table_id)
+    r = []
+    if not cps.get([t.data()], r):
+        print 'CPS Get failed for ACL Table'
+        return
+    for t_cps in r:
+        _valid = True
+        t = TableCPSObj(cps_data=t_cps)
+        if priority!=None:
+           try:
+                _val = t.extract('priority')
+                if _val!=priority:
+                    continue
+           except:
+                continue
+
+        if matchfields!=None:
+            _val = t.extract('allowed-match-fields')
+            for i in matchfields:
+                if i in _val: continue
+                _valid=False
+                break
+        if not _valid:
+            continue
+
+        if table_stage!=None:
+            _val = t.extract('stage')
+            if _val!=table_stage:
+                continue
+        return t
+    return None
+
+def __extract_attr(e,name):
+    try:
+        _val = e.extract(name)
+        return _val
+    except:
+        pass
+    return None
+
+def find_entry(table_id=None, entry_id=None,priority=None,filter_map={},\
+    action_map={}):
+    """
+    Find the entry based on the parameters in the actions/filters and other parameters.
+    """
+
+    e = EntryCPSObj(table_id=table_id, priority=priority)
+
+    for ftype, fval in filter_map.items():
+        e.add_match_filter(filter_type=ftype, filter_val=fval)
+
+    for atype, aval in action_map.items():
+        e.add_action(action_type=atype, action_val=aval)
+
+    _ent_data = e.data()
+
+    r = []
+    if not cps.get([e.data()], r):
+        print 'CPS Get failed for ACL Entry' + str(entry_id)
+        return
+    for e_cps in r:
+        def __cmp_maps(to_o, from_o):
+            print('Comparing ',to_o,from_o)
+            for _ent in from_o.keys():
+                _rhs_data = from_o[_ent]
+                if _ent not in to_o:  return False
+                _lhs_data = to_o[_ent]
+
+                if type(_lhs_data) != type(_rhs_data): return False
+                if type(dict) == type(_lhs_data):
+                    __cmp_maps(_lhs_data,_rhs_data)
+
+                if type(_lhs_data) == type([]):
+                    if len(_lhs_data)!=len(_rhs_data): return False
+                    for _ix in range(0,len(_lhs_data)):
+                         #first item
+                        _a = _lhs_data[ix]
+                        _b = _rhs_data[ix]
+                        if _a != _b: return False
+            return True
+
+        # remember that we can't use all keys - since there are other things in the object that shouldn't be there
+        if not __cmp_maps(e_cps['data'],_ent_data['data']):
+            print('Not the same',e_cps['data'], 'and',_ent_data['data'])
+            continue
+
+        return e_cps['data']
+    return None
+
+
+def create_table(stage, prio, allow_filters, allow_actions=None, name=None, size=None, switch_id=0,
+                 udf_groups=None, only_if_not_exist=False):
+    if only_if_not_exist:
+        _table = find_table(priority=prio,matchfields=allow_filters,\
+                table_stage=stage)
+        if _table!=None:
+            return _table.extract_id()
+
+    t = TableCPSObj(stage=stage, priority=prio, table_id=name, size=size, switch_id=switch_id)
 
     for f in allow_filters:
         t.add_allow_filter(f)
+
+    if allow_actions is not None:
+        for a in allow_actions:
+            t.add_allow_action(a)
+
+    if udf_groups != None:
+        for grp_id in udf_groups:
+            t.add_udf_group(grp_id)
 
     upd = ('create', t.data())
     r = cps_utils.CPSTransaction([upd]).commit()
@@ -53,13 +159,13 @@ def create_table(stage, prio, allow_filters, switch_id=0):
 
     t = TableCPSObj(cps_data=r[0])
     table_id = t.extract_id()
-    print "Created Table " + str(table_id)
     return table_id
 
 
-def create_entry(table_id, prio, filter_map, action_map, switch_id=0):
+def create_entry(table_id, prio, filter_map, action_map, name=None, switch_id=0):
 
-    e = EntryCPSObj(table_id=table_id, priority=prio, switch_id=switch_id)
+    e = EntryCPSObj(table_id=table_id, priority=prio, entry_id=name,
+                    switch_id=switch_id)
 
     for ftype, fval in filter_map.items():
         e.add_match_filter(filter_type=ftype, filter_val=fval)
@@ -75,12 +181,12 @@ def create_entry(table_id, prio, filter_map, action_map, switch_id=0):
 
     e = EntryCPSObj(cps_data=r[0])
     entry_id = e.extract_id()
-    print "Created Entry " + str(entry_id)
     return entry_id
 
 
-def create_counter(table_id, types=['BYTE'], switch_id=0):
-    c = CounterCPSObj(table_id=table_id, types=types, switch_id=switch_id)
+def create_counter(table_id, types=['BYTE'], name=None, switch_id=0):
+    c = CounterCPSObj(table_id=table_id, types=types, counter_id=name,
+                      switch_id=switch_id)
     upd = ('create', c.data())
     r = cps_utils.CPSTransaction([upd]).commit()
 

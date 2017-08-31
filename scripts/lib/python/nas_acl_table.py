@@ -30,6 +30,7 @@ class TableCPSObj(nab.AclCPSObj):
         t = nas_acl.TableCPSObj (stage='INGRESS', priority=prio)
         t.add_allow_filter('SRC_IP')
         t.add_allow_filter('IP_TYPE')
+        t.add_allow_action('PACKET_ACTION')
 
         upd = ('create', t.data())
         ret = cps_utils.CPSTransaction ([upd]).commit ()
@@ -50,11 +51,12 @@ class TableCPSObj(nab.AclCPSObj):
     obj_name = nab.obj_root + '/table'
 
     def __init__(self, table_id=None, stage=None,
-                 priority=None, switch_id=0, cps_data=None, npu_id_list=[]):
+                 priority=None, size=None, switch_id=0, cps_data=None,
+                 npu_id_list=[]):
         """
         Initialize the CPS object Python dictionary with the input parameters.
-        @table_id, @stage, @priority, @switch_id - form the CPS object with the
-                                                   corresponding attributes
+        @table_id, @stage, @priority, @name, @size, @switch_id - form the CPS object with the
+                                                                 corresponding attributes
         @cps_data - form the CPS object from CPS data returned from a Create or Set.
         """
 
@@ -69,8 +71,13 @@ class TableCPSObj(nab.AclCPSObj):
             self.add_attr(self.obj_dict, 'priority', priority)
         if stage is not None:
             self.add_attr(self.obj_dict, 'stage', stage)
+        if size is not None:
+            self.add_attr(self.obj_dict, 'size', size)
         if table_id is not None:
-            self.add_attr(self.obj_dict, 'id', table_id)
+            if type(table_id) is int:
+                self.add_attr(self.obj_dict, 'id', table_id)
+            elif type(table_id) is str:
+                self.add_attr(self.obj_dict, 'name', table_id)
         if npu_id_list:
             self.add_attr(self.obj_dict, 'npu-id-list', npu_id_list)
 
@@ -89,6 +96,22 @@ class TableCPSObj(nab.AclCPSObj):
         @filter_type - yang enum name of the match field ('SRC_IPV6')
         """
         self.add_attr(self.obj_dict, 'allowed-match-fields', filter_type)
+
+    def add_allow_action(self, action_type):
+        """
+        Add allowed action to this Table
+
+        @filter_type - yang enum name of the action type ('PACKET_ACTION')
+        """
+        self.add_attr(self.obj_dict, 'allowed-actions', action_type)
+
+    def add_udf_group(self, group_id):
+        """
+        Add UDF group to this Table
+
+        @group_id - UDF Group ID
+        """
+        self.add_attr(self.obj_dict, 'udf-group-list', group_id)
 
     def data(self):
         """

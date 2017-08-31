@@ -1,0 +1,6 @@
+#ACL Configuration File
+
+ACL Entries:
+	- block-unknown -A INPUT -p ssh -m mac --mac-source 00:00:00:00:00:001 --dport 80 -j DROP
+	- more-bad -A INPUT -p ssh -m mac --mac-source 00:00:00:00:00:001 --dport 80 -j DROP
+	- http -A INPUT -p tcp --dport 80 -j ACCEPT

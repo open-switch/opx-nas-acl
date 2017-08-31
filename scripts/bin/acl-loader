@@ -1,0 +1,21 @@
+#!/usr/bin/python
+
+import cps
+import cps_utils
+import cps_object
+import cps_operations
+
+import sys
+
+_KEY='acl-config/entry'
+
+obj = cps_object.CPSObject(module='acl-config/reload',qual='target')
+obj.add_attr('acl-config/reload/input/filename',sys.argv[1])
+
+
+tr = cps_operations.CPSTransaction()
+tr.rpc(obj.get())
+_res = cps.commit(tr.get_objects())
+print (_res)
+
+

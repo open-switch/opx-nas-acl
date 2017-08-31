@@ -19,7 +19,10 @@ table_attr_map = {
     'size': ('leaf', 'uint32_t'),
     'stage': ('leaf', 'enum', 'base-acl:stage:'),
     'priority': ('leaf', 'uint32_t'),
+    'name': ('leaf', 'string'),
     'allowed-match-fields': ('leaflist', 'enum', 'base-acl:match-type:'),
+    'allowed-actions': ('leaflist', 'enum', 'base-acl:action-type:'),
+    'udf-group-list': ('leaflist', 'uint64_t'),
     'npu-id-list': ('leaflist', 'uint32_t'),
 }
 
@@ -28,8 +31,6 @@ def get_table_attr_map():
     return table_attr_map
 
 filter_name2val_map = {
-    'SRC_IP': 'SRC_IP_VALUE',
-    'ETHER_TYPE': 'ETHER_TYPE_VALUE',
     'SRC_IPV6': 'SRC_IPV6_VALUE',
     'DST_IPV6': 'DST_IPV6_VALUE',
     'SRC_MAC': 'SRC_MAC_VALUE',
@@ -64,11 +65,21 @@ filter_name2val_map = {
     'ICMP_CODE': 'ICMP_CODE_VALUE',
     'SRC_PORT': 'SRC_PORT_VALUE',
     'DST_PORT': 'DST_PORT_VALUE',
+    'NEIGHBOR_DST_HIT': 'NEIGHBOR_DST_HIT_VALUE',
+    'ROUTE_DST_HIT': 'ROUTE_DST_HIT_VALUE',
+    'FDB_DST_HIT': 'FDB_DST_HIT_VALUE',
+    'IN_INTFS': 'IN_INTFS_VALUE',
+    'OUT_INTFS': 'OUT_INTFS_VALUE',
+    'IN_INTF': 'IN_INTF_VALUE',
+    'OUT_INTF': 'OUT_INTF_VALUE',
+    'SRC_INTF': 'SRC_INTF_VALUE',
+    'UDF': 'UDF_VALUE',
+    'IPV6_NEXT_HEADER': 'IPV6_NEXT_HEADER_VALUE',
+    'RANGE_CHECK': 'RANGE_CHECK_VALUE',
 }
 
 action_name2val_map = {
     'PACKET_ACTION': 'PACKET_ACTION_VALUE',
-    'SET_SRC_MAC': 'NEW_SRC_MAC_VALUE',
     'REDIRECT_PORT': 'REDIRECT_PORT_VALUE',
     'REDIRECT_IP_NEXTHOP': 'IP_NEXTHOP_GROUP_VALUE',
     'MIRROR_INGRESS': 'MIRROR_INGRESS_VALUE',
@@ -91,7 +102,13 @@ action_name2val_map = {
     'SET_L4_DST_PORT': 'NEW_L4_DST_PORT_VALUE',
     'SET_CPU_QUEUE': 'CPU_QUEUE_VALUE',
     'EGRESS_MASK': 'EGRESS_MASK_VALUE',
+    'EGRESS_INTF_MASK': 'EGRESS_INTF_MASK_VALUE',
     'REDIRECT_PORT_LIST': 'REDIRECT_PORT_LIST_VALUE',
+    'REDIRECT_INTF': 'REDIRECT_INTF_VALUE',
+    'REDIRECT_INTF_MASK': 'REDIRECT_INTF_MASK_VALUE',
+    'REDIRECT_INTF_LIST': 'REDIRECT_INTF_LIST_VALUE',
+    'SET_USER_TRAP_ID': 'SET_USER_TRAP_ID_VALUE',
+    'SET_PACKET_COLOR': 'SET_PACKET_COLOR_VALUE',
 }
 
 entry_attr_map = {
@@ -101,6 +118,8 @@ entry_attr_map = {
     'priority': ('leaf', 'uint32_t'),
     'match': ('list',),
     'action': ('list',),
+    'table-name': ('leaf', 'string'),
+    'name': ('leaf', 'string'),
     'npu-id-list': ('leaflist', 'uint32_t'),
     'match/type': ('leaf', 'enum', 'base-acl:match-type:'),
     'action/type': ('leaf', 'enum', 'base-acl:action-type:'),
@@ -214,6 +233,26 @@ entry_attr_map = {
     'match/SRC_PORT_VALUE': ('leaf', 'intf'),
     'match/DST_PORT_VALUE': ('leaf', 'intf'),
 
+    'match/IN_INTFS_VALUE': ('leaflist', 'string'),
+    'match/OUT_INTFS_VALUE': ('leaflist', 'string'),
+    'match/IN_INTF_VALUE': ('leaf', 'string'),
+    'match/OUT_INTF_VALUE': ('leaf', 'string'),
+    'match/SRC_INTF_VALUE': ('leaf', 'string'),
+    'match/UDF_VALUE': ('container',),
+    'match/UDF_VALUE/udf-group-id': ('leaf', 'uint64_t'),
+    'match/UDF_VALUE/match-data': ('leaf', 'bin'),
+    'match/UDF_VALUE/match-mask': ('leaf', 'bin'),
+
+    'match/IPV6_NEXT_HEADER_VALUE': ('container', 'data'),
+    'match/IPV6_NEXT_HEADER_VALUE/data': ('leaf', 'uint8_t'),
+    'match/IPV6_NEXT_HEADER_VALUE/mask': ('leaf', 'uint8_t'),
+
+    'match/RANGE_CHECK_VALUE': ('leaflist', 'uint64_t'),
+
+    'match/NEIGHBOR_DST_HIT_VALUE': ('leaf', 'bool'),
+    'match/ROUTE_DST_HIT_VALUE': ('leaf', 'bool'),
+    'match/FDB_DST_HIT_VALUE': ('leaf', 'bool'),
+
     'action/PACKET_ACTION_VALUE':
     ('leaf', 'enum', 'base-acl:packet-action-type:'),
     'action/REDIRECT_PORT_VALUE': ('leaf', 'intf'),
@@ -254,6 +293,15 @@ entry_attr_map = {
     'action/CPU_QUEUE_VALUE': ('container',),
     'action/CPU_QUEUE_VALUE/index': ('leaf', 'uint64_t'),
     'action/CPU_QUEUE_VALUE/data': ('leaf', 'opaque'),
+
+    'action/EGRESS_MASK_VALUE': ('leaflist', 'intf'),
+    'action/EGRESS_INTF_MASK_VALUE': ('leaflist', 'string'),
+    'action/REDIRECT_PORT_LIST_VALUE': ('leaflist', 'intf'),
+    'action/REDIRECT_INTF_VALUE': ('leaf', 'string'),
+    'action/REDIRECT_INTF_MASK_VALUE': ('leaf', 'string'),
+    'action/REDIRECT_INTF_LIST_VALUE': ('leaflist', 'string'),
+    'action/SET_USER_TRAP_ID_VALUE': ('leaf', 'uint32_t'),
+    'action/SET_PACKET_COLOR_VALUE': ('leaf', 'enum', 'base-acl:packet-color:'),
 }
 
 
@@ -302,6 +350,11 @@ enum_map = {
     'base-acl:action-type:SET_CPU_QUEUE': 24,
     'base-acl:action-type:EGRESS_MASK': 25,
     'base-acl:action-type:REDIRECT_PORT_LIST': 26,
+    'base-acl:action-type:REDIRECT_INTF': 27,
+    'base-acl:action-type:EGRESS_INTF_MASK': 28,
+    'base-acl:action-type:REDIRECT_INTF_LIST': 29,
+    'base-acl:action-type:SET_USER_TRAP_ID': 30,
+    'base-acl:action-type:SET_PACKET_COLOR': 31,
 
     'base-acl:match-type:SRC_IPV6': 1,
     'base-acl:match-type:DST_IPV6': 2,
@@ -339,6 +392,15 @@ enum_map = {
     'base-acl:match-type:DST_PORT': 34,
     'base-acl:match-type:NEIGHBOR_DST_HIT': 35,
     'base-acl:match-type:ROUTE_DST_HIT': 36,
+    'base-acl:match-type:IN_INTFS': 37,
+    'base-acl:match-type:OUT_INTFS': 38,
+    'base-acl:match-type:IN_INTF': 39,
+    'base-acl:match-type:OUT_INTF': 40,
+    'base-acl:match-type:SRC_INTF': 41,
+    'base-acl:match-type:UDF': 42,
+    'base-acl:match-type:IPV6_NEXT_HEADER': 43,
+    'base-acl:match-type:RANGE_CHECK': 44,
+    'base-acl:match-type:FDB_DST_HIT': 45,
 
     'base-acl:packet-action-type:DROP': 1,
     'base-acl:packet-action-type:FORWARD': 2,
@@ -365,6 +427,10 @@ enum_map = {
     'base-acl:match-ip-frag:NON_FRAG_OR_HEAD': 3,
     'base-acl:match-ip-frag:HEAD': 4,
     'base-acl:match-ip-frag:NON_HEAD': 5,
+
+    'base-acl:packet-color:GREEN': 1,
+    'base-acl:packet-color:YELLOW': 2,
+    'base-acl:packet-color:RED': 3,
 }
 
 

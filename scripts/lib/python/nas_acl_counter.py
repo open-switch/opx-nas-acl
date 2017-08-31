@@ -54,6 +54,8 @@ class CounterCPSObj(nab.AclCPSObj):
         'types':
         ('leaflist', 'enum', 'base-acl:counter-type:'),
         'npu-id-list': ('leaflist', 'uint32_t'),
+        'name': ('leaf', 'string'),
+        'table-name': ('leaf', 'string'),
     }
 
     def __init__(
@@ -74,9 +76,15 @@ class CounterCPSObj(nab.AclCPSObj):
         self.obj_dict = {}
 
         if counter_id is not None:
-            self.add_attr(self.obj_dict, 'id', counter_id)
+            if type(counter_id) is int:
+                self.add_attr(self.obj_dict, 'id', counter_id)
+            elif type(counter_id) is str:
+                self.add_attr(self.obj_dict, 'name', counter_id)
         if table_id is not None:
-            self.add_attr(self.obj_dict, 'table-id', table_id)
+            if type(table_id) is int:
+                self.add_attr(self.obj_dict, 'table-id', table_id)
+            elif type(table_id) is str:
+                self.add_attr(self.obj_dict, 'table-name', table_id)
         if npu_id_list:
             self.add_attr(self.obj_dict, 'npu-id-list', npu_id_list)
         for t in types:

@@ -86,9 +86,15 @@ class EntryCPSObj(nab.AclCPSObj):
         if priority is not None:
             self.add_attr(self.obj_dict, 'priority', priority)
         if entry_id is not None:
-            self.add_attr(self.obj_dict, 'id', entry_id)
+            if type(entry_id) is int:
+                self.add_attr(self.obj_dict, 'id', entry_id)
+            elif type(entry_id) is str:
+                self.add_attr(self.obj_dict, 'name', entry_id)
         if table_id is not None:
-            self.add_attr(self.obj_dict, 'table-id', table_id)
+            if type(table_id) is int:
+                self.add_attr(self.obj_dict, 'table-id', table_id)
+            elif type(table_id) is str:
+                self.add_attr(self.obj_dict, 'table-name', table_id)
         if npu_id_list:
             self.add_attr(self.obj_dict, 'npu-id-list', npu_id_list)
 
@@ -206,12 +212,13 @@ class EntryCPSObj(nab.AclCPSObj):
         key_path = key_prefix + 'type'
         elem_type = input_subobj['type_str']
         cls.add_attr(out_subobj, key_path, elem_type)
-        cls.__make_subobj_val(
-            elem_type,
-            key_prefix,
-            input_subobj['val'],
-            val_name_map,
-            out_subobj)
+        if val_name_map[elem_type] != None:
+            cls.__make_subobj_val(
+                elem_type,
+                key_prefix,
+                input_subobj['val'],
+                val_name_map,
+                out_subobj)
         return out_subobj
 
     @classmethod
@@ -232,7 +239,7 @@ class EntryCPSObj(nab.AclCPSObj):
     @classmethod
     def __make_subobj_val(
             self, elem_type, key_prefix, input_val, val_name_map, out_subobj):
-        if elem_type not in val_name_map:
+        if input_val is None or elem_type not in val_name_map:
             # No data for this element
             return out_subobj
 

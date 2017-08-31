@@ -27,6 +27,8 @@ class StatsCPSObj(nab.AclCPSObj):
         'matched-packets': ('leaf', 'uint64_t'),
         'matched-bytes': ('leaf', 'uint64_t'),
         'npu-id-list': ('leaflist', 'uint32_t'),
+        'table-name': ('leaf', 'string'),
+        'counter-name': ('leaf', 'string'),
     }
 
     def __init__(self, table_id=None, counter_id=None,
@@ -46,9 +48,15 @@ class StatsCPSObj(nab.AclCPSObj):
         self.obj_dict = {}
 
         if counter_id is not None:
-            self.add_attr(self.obj_dict, 'counter-id', counter_id)
+            if type(counter_id) is int:
+                self.add_attr(self.obj_dict, 'counter-id', counter_id)
+            elif type(counter_id) is str:
+                self.add_attr(self.obj_dict, 'counter-name', counter_id)
         if table_id is not None:
-            self.add_attr(self.obj_dict, 'table-id', table_id)
+            if type(table_id) is int:
+                self.add_attr(self.obj_dict, 'table-id', table_id)
+            elif type(table_id) is str:
+                self.add_attr(self.obj_dict, 'table-name', table_id)
         if pkt_count is not None:
             self.add_attr(self.obj_dict, 'matched-packets', pkt_count)
         if byte_count is not None:
