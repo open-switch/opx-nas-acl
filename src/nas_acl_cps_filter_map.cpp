@@ -26,7 +26,7 @@
 #include "nas_acl_common.h"
 #include "nas_acl_udf.h"
 
-static const nas_acl_filter_map_t _filter_map =
+static const auto& _filter_map = *new nas_acl_filter_map_t
 {
     {BASE_ACL_MATCH_TYPE_SRC_IPV6,
         {
@@ -868,15 +868,15 @@ static const nas_acl_filter_map_t _filter_map =
         {
             "MATCH_TYPE_NEIGHBOR_DST_HIT",
             {
-                0,
-                NAS_ACL_DATA_NONE,
-                0,
-                NAS_ACL_ATTR_MODE_MANDATORY,
-                {},
+                BASE_ACL_ENTRY_MATCH_NEIGHBOR_DST_HIT_VALUE,
+                NAS_ACL_DATA_U32,
+                sizeof (uint32_t),
+                NAS_ACL_ATTR_MODE_OPTIONAL,
+                {false, true},
             },
             {},
-            NULL,
-            NULL,
+            &nas_acl_filter_t::get_u32_filter_val,
+            &nas_acl_filter_t::set_u32_filter_val,
         },
     },
 
@@ -884,15 +884,31 @@ static const nas_acl_filter_map_t _filter_map =
         {
             "MATCH_TYPE_ROUTE_DST_HIT",
             {
-                0,
-                NAS_ACL_DATA_NONE,
-                0,
-                NAS_ACL_ATTR_MODE_MANDATORY,
-                {},
+                BASE_ACL_ENTRY_MATCH_ROUTE_DST_HIT_VALUE,
+                NAS_ACL_DATA_U32,
+                sizeof (uint32_t),
+                NAS_ACL_ATTR_MODE_OPTIONAL,
+                {false, true},
             },
             {},
-            NULL,
-            NULL,
+            &nas_acl_filter_t::get_u32_filter_val,
+            &nas_acl_filter_t::set_u32_filter_val,
+        },
+    },
+
+    {BASE_ACL_MATCH_TYPE_FDB_DST_HIT,
+        {
+            "MATCH_TYPE_FDB_DST_HIT",
+            {
+                BASE_ACL_ENTRY_MATCH_FDB_DST_HIT_VALUE,
+                NAS_ACL_DATA_U32,
+                sizeof (uint32_t),
+                NAS_ACL_ATTR_MODE_OPTIONAL,
+                {false, true},
+            },
+            {},
+            &nas_acl_filter_t::get_u32_filter_val,
+            &nas_acl_filter_t::set_u32_filter_val,
         },
     },
 
@@ -1007,8 +1023,52 @@ static const nas_acl_filter_map_t _filter_map =
             &nas_acl_filter_t::set_udf_filter_val,
         },
     },
+
+    {BASE_ACL_MATCH_TYPE_RANGE_CHECK,
+        {
+            "MATCH_TYPE_RANGE_CHECK",
+            {
+                BASE_ACL_ENTRY_MATCH_RANGE_CHECK_VALUE,
+                NAS_ACL_DATA_OBJ_ID_LIST,
+                {},
+            },
+            {},
+            &nas_acl_filter_t::get_obj_id_list_filter_val,
+            &nas_acl_filter_t::set_obj_id_list_filter_val,
+        }
+    },
+
+    {BASE_ACL_MATCH_TYPE_IPV6_NEXT_HEADER,
+        {
+            "MATCH_TYPE_IPV6_NEXT_HEADER",
+            {
+                BASE_ACL_ENTRY_MATCH_IPV6_NEXT_HEADER_VALUE,
+                NAS_ACL_DATA_EMBEDDED,
+                {}
+            },
+            {
+                {
+                    BASE_ACL_ENTRY_MATCH_IPV6_NEXT_HEADER_VALUE_DATA,
+                    NAS_ACL_DATA_U8,
+                    sizeof (uint8_t),
+                    NAS_ACL_ATTR_MODE_MANDATORY,
+                    {},
+                },
+                {
+                    BASE_ACL_ENTRY_MATCH_IPV6_NEXT_HEADER_VALUE_MASK,
+                    NAS_ACL_DATA_U8,
+                    sizeof (uint8_t),
+                    NAS_ACL_ATTR_MODE_OPTIONAL,
+                    {},
+                },
+            },
+            &nas_acl_filter_t::get_u8_filter_val,
+            &nas_acl_filter_t::set_u8_filter_val,
+        },
+    },
 };
 
+// Return name of given filter type id
 const char* nas_acl_filter_type_name (BASE_ACL_MATCH_TYPE_t type) noexcept
 {
     auto it = _filter_map.find (type);
@@ -1018,6 +1078,7 @@ const char* nas_acl_filter_type_name (BASE_ACL_MATCH_TYPE_t type) noexcept
     return it->second.name.c_str();
 }
 
+// Return if given filter type id is corresponding to valid ACL filter
 bool nas_acl_filter_is_type_valid (BASE_ACL_MATCH_TYPE_t f_type) noexcept
 {
     if (_filter_map.find (f_type) == _filter_map.end()) {
@@ -1026,6 +1087,7 @@ bool nas_acl_filter_is_type_valid (BASE_ACL_MATCH_TYPE_t f_type) noexcept
     return true;
 }
 
+// Return ACL filter map
 nas_acl_filter_map_t& nas_acl_get_filter_map () noexcept
 {
     return (_filter_map);

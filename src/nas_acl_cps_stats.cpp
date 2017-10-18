@@ -63,9 +63,26 @@ static bool nas_acl_stats_cps_key_init (cps_api_object_t obj,
         NAS_ACL_LOG_ERR ("Failed to set Table ID in Key");
         return false;
     }
+    const char* tbl_name = counter.table_name();
+    if (tbl_name != nullptr) {
+        if (!cps_api_object_attr_add(obj, BASE_ACL_STATS_TABLE_NAME, tbl_name,
+                                     strlen(tbl_name) + 1)) {
+            NAS_ACL_LOG_ERR("Failed to add table name");
+            return false;
+        }
+    }
+
     if (!nas_acl_cps_key_set_obj_id (obj, BASE_ACL_STATS_COUNTER_ID, counter.counter_id())) {
         NAS_ACL_LOG_ERR ("Failed to set Counter ID in Key");
         return false;
+    }
+    const char* cnt_name = counter.counter_name();
+    if (cnt_name != nullptr){
+        if (!cps_api_object_attr_add(obj, BASE_ACL_STATS_COUNTER_NAME, cnt_name,
+                                     strlen(cnt_name) + 1)) {
+            NAS_ACL_LOG_ERR("Failed to add counter name");
+            return false;
+        }
     }
 
     return true;
@@ -214,19 +231,6 @@ static t_std_error nas_acl_stats_set (cps_api_object_t obj,
         NAS_ACL_LOG_ERR ("Switch ID is a mandatory key for Counter Stats Modify ");
         return NAS_ACL_E_MISSING_KEY;
     }
-    if (!nas_acl_cps_key_get_obj_id (obj, BASE_ACL_STATS_TABLE_ID,
-                                     &table_id)) {
-        NAS_ACL_LOG_ERR ("Table ID is a mandatory key for Counter Stats Modify ");
-        return NAS_ACL_E_MISSING_KEY;
-    }
-    if (!nas_acl_cps_key_get_obj_id (obj, BASE_ACL_STATS_COUNTER_ID, &counter_id)) {
-        NAS_ACL_LOG_ERR ("Counter ID is a mandatory key for Counter Stats Modify");
-        return NAS_ACL_E_MISSING_KEY;
-    }
-
-    NAS_ACL_LOG_BRIEF ("Switch Id: %d, Table Id: %ld, Counter Id: %ld, SET Stats",
-                       switch_id, table_id, counter_id);
-
     if (!_extract_stats_attrs (obj, nas_acl_stats_op_type::SET,
                               &filt_npu_list, &is_pkt_count_set,
                               &is_byte_count_set, &pkt_count, &byte_count)) {
@@ -234,10 +238,47 @@ static t_std_error nas_acl_stats_set (cps_api_object_t obj,
     }
 
     try {
-        auto& counter = nas_acl_get_switch(switch_id).get_counter(table_id, counter_id);
+        nas_acl_switch& sw    = nas_acl_get_switch (switch_id);
+
+        if (!nas_acl_cps_key_get_obj_id (obj, BASE_ACL_STATS_TABLE_ID,
+                                         &table_id)) {
+            cps_api_object_attr_t tbl_name_attr = cps_api_get_key_data(obj,
+                                                    BASE_ACL_STATS_TABLE_NAME);
+            if (tbl_name_attr == nullptr) {
+                NAS_ACL_LOG_ERR ("No Table ID or Name found for Stats Modify ");
+                return NAS_ACL_E_MISSING_KEY;
+            }
+            char* tbl_name = (char*)cps_api_object_attr_data_bin(tbl_name_attr);
+            nas_acl_table* table_p = sw.find_table_by_name(tbl_name);
+            if (table_p == nullptr) {
+                NAS_ACL_LOG_ERR("No Table with name %s was found", tbl_name);
+                return NAS_ACL_E_MISSING_KEY;
+            }
+            table_id = table_p->table_id();
+        }
+
+        if (!nas_acl_cps_key_get_obj_id (obj, BASE_ACL_STATS_COUNTER_ID, &counter_id)) {
+            cps_api_object_attr_t cnt_name_attr = cps_api_get_key_data(obj,
+                                                            BASE_ACL_STATS_COUNTER_NAME);
+            if (cnt_name_attr == nullptr) {
+                NAS_ACL_LOG_ERR ("No Counter ID of Name found for Stats Modify");
+                return NAS_ACL_E_MISSING_KEY;
+            }
+            char* cnt_name = (char*)cps_api_object_attr_data_bin(cnt_name_attr);
+            nas_acl_counter_t* counter_p = sw.find_counter_by_name(table_id, cnt_name);
+            if (counter_p == nullptr) {
+                NAS_ACL_LOG_ERR("No Counter with name %s was found", cnt_name);
+                return NAS_ACL_E_MISSING_KEY;
+            }
+            counter_id = counter_p->counter_id();
+        }
+
+        NAS_ACL_LOG_BRIEF ("Switch Id: %d, Table Id: %ld, Counter Id: %ld, SET Stats",
+                           switch_id, table_id, counter_id);
+
+        auto& counter = sw.get_counter(table_id, counter_id);
 
         const nas::npu_set_t& loop_npu = (filt_npu_list.empty()) ? counter.npu_list(): filt_npu_list;
-
         for (auto npu_id: loop_npu) {
 
             if (is_pkt_count_set) {

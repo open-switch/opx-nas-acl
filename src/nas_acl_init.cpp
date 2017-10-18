@@ -41,7 +41,7 @@ static t_std_error _cps_init ()
 
     if (rc != cps_api_ret_code_OK) {
         NAS_ACL_LOG_ERR ("NAS ACL CPS Subsystem Init failed");
-        return STD_ERR(QOS, FAIL, rc);
+        return STD_ERR(ACL, FAIL, rc);
     }
 
     memset (&f, 0, sizeof(f));
@@ -66,7 +66,7 @@ static t_std_error _cps_init ()
 
     if (rc != cps_api_ret_code_OK) {
         NAS_ACL_LOG_ERR ("NAS ACL CPS object Register failed");
-        return STD_ERR(QOS, FAIL, rc);
+        return STD_ERR(ACL, FAIL, rc);
     }
 
     memset (&f, 0, sizeof(f));
@@ -89,7 +89,7 @@ static t_std_error _cps_init ()
 
     if (rc != cps_api_ret_code_OK) {
         NAS_ACL_LOG_ERR ("NAS UDF CPS object Register failed");
-        return STD_ERR(QOS, FAIL, rc);
+        return STD_ERR(ACL, FAIL, rc);
     }
 
 

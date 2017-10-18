@@ -1,3 +1,11 @@
+opx-nas-acl (2.2.0) unstable; urgency=medium
+
+  * Update: Added packet color actions
+  * Update: Added named tables, entries and counters
+  * Update: Added allowed actions
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Fri, 13 Oct 2017  11:00:00 -0800
+
 opx-nas-acl (1.3.1) unstable; urgency=medium
 
   * Update: Added support for ACL user defined filter (UDF) configuration and ACL action to set user trap ID

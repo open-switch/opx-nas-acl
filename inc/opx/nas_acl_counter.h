@@ -50,6 +50,7 @@ public:
     /////// Accessors ////////
     const nas_acl_table&     get_table() const noexcept {return *_table_p;}
     nas_obj_id_t             table_id() const noexcept;
+    const char*              table_name() const noexcept;
     nas_obj_id_t             counter_id() const noexcept {return _counter_id;}
     ndi_obj_id_t             ndi_obj_id (npu_id_t npu_id) const;
     bool                     is_obj_in_npu (npu_id_t  npu_id) const noexcept;
@@ -64,6 +65,7 @@ public:
     //////// Modifiers ////////
     void set_counter_id (nas_obj_id_t id);
     void set_type (uint_t type, bool reset=true);
+    void set_counter_name(const char* name);
     void add_npu (npu_id_t npu_id, bool reset=true) override;
     void add_ref (nas_obj_id_t entry_id);
     void del_ref (nas_obj_id_t entry_id);
@@ -87,11 +89,19 @@ public:
 
     bool push_leaf_attr_to_npu (nas_attr_id_t attr_id,
                                 npu_id_t npu_id) override {return true;}
-
+    const char* counter_name() const
+    {
+        if (_counter_name.size() > 0) {
+            return _counter_name.c_str();
+        } else {
+            return nullptr;
+        }
+    }
 
 private:
     const nas_acl_table*   _table_p;
     nas_obj_id_t           _counter_id = 0;
+    std::string            _counter_name;
     bool                   _enable_pkt_count = false;
     bool                   _enable_byte_count = false;
     bool                   _following_table_npus = true;

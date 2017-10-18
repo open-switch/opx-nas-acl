@@ -104,6 +104,21 @@ _fill_counter_attr_info (cps_api_object_t obj, const nas_acl_counter_t& counter,
         }
     }
 
+    if (counter.counter_name() != nullptr) {
+        if (!cps_api_object_attr_add(obj, BASE_ACL_COUNTER_NAME, counter.counter_name(),
+                                     strlen(counter.counter_name()) + 1)) {
+            return false;
+        }
+    }
+
+    const char* tbl_name = counter.table_name();
+    if (tbl_name != nullptr) {
+        if (!cps_api_object_attr_add(obj, BASE_ACL_COUNTER_TABLE_NAME, tbl_name,
+                                     strlen(tbl_name) + 1)) {
+            return false;
+        }
+    }
+
     if (!_fill_counter_npu_list (obj, counter, explicit_npu_list)) {
         return false;
     }
@@ -239,16 +254,20 @@ nas_acl_get_counter (cps_api_get_params_t *param, size_t index,
     nas_switch_id_t        switch_id;
     nas_obj_id_t           table_id;
     nas_obj_id_t           counter_id;
-    nas_attr_id_t          table_id_attr_id;
-    nas_attr_id_t          counter_id_attr_id;
+    nas_attr_id_t          table_id_attr_id, table_name_attr_id;
+    nas_attr_id_t          counter_id_attr_id, counter_name_attr_id;
 
     if (obj_type == BASE_ACL_COUNTER_OBJ) {
         table_id_attr_id  = BASE_ACL_COUNTER_TABLE_ID;
+        table_name_attr_id = BASE_ACL_COUNTER_TABLE_NAME;
         counter_id_attr_id  = BASE_ACL_COUNTER_ID;
+        counter_name_attr_id = BASE_ACL_COUNTER_NAME;
     }
     else {
         table_id_attr_id  = BASE_ACL_STATS_TABLE_ID;
+        table_name_attr_id  = BASE_ACL_STATS_TABLE_NAME;
         counter_id_attr_id  = BASE_ACL_STATS_COUNTER_ID;
+        counter_name_attr_id  = BASE_ACL_STATS_COUNTER_NAME;
     }
 
     bool switch_id_key = nas_acl_cps_key_get_switch_id (filter_obj,
@@ -257,9 +276,38 @@ nas_acl_get_counter (cps_api_get_params_t *param, size_t index,
     bool table_id_key = nas_acl_cps_key_get_obj_id (filter_obj,
                                                     table_id_attr_id,
                                                     &table_id);
+    if (switch_id_key && !table_id_key) {
+        nas_acl_switch& sw = nas_acl_get_switch(switch_id);
+        cps_api_object_attr_t name_attr = cps_api_get_key_data(filter_obj,
+                                                               table_name_attr_id);
+        if (name_attr != nullptr) {
+            char* table_name = (char*)cps_api_object_attr_data_bin(name_attr);
+            nas_acl_table* table_p = sw.find_table_by_name(table_name);
+            if (table_p == nullptr) {
+                NAS_ACL_LOG_ERR("ACL Table with specific name not found");
+                return NAS_ACL_E_ATTR_VAL;
+            }
+            table_id_key = true;
+            table_id = table_p->table_id();
+        }
+    }
     bool counter_id_key = nas_acl_cps_key_get_obj_id (filter_obj,
                                                       counter_id_attr_id,
                                                       &counter_id);
+    if (switch_id_key && table_id_key && !counter_id_key) {
+        nas_acl_switch& sw = nas_acl_get_switch(switch_id);
+        cps_api_object_attr_t name_attr = cps_api_get_key_data(filter_obj, counter_name_attr_id);
+        if (name_attr != nullptr) {
+            char* counter_name = (char*)cps_api_object_attr_data_bin(name_attr);
+            nas_acl_counter_t* counter_p = sw.find_counter_by_name(table_id, counter_name);
+            if (counter_p == nullptr) {
+                NAS_ACL_LOG_ERR("ACL Counter with specific name not found");
+                return NAS_ACL_E_ATTR_VAL;
+            }
+            counter_id_key = true;
+            counter_id = counter_p->counter_id();
+        }
+    }
 
     try {
         if (!switch_id_key) {
@@ -321,13 +369,6 @@ t_std_error nas_acl_counter_create (cps_api_object_t obj,
         NAS_ACL_LOG_ERR ("Switch ID is a mandatory key for Counter Create ");
         return NAS_ACL_E_MISSING_KEY;
     }
-    if (!nas_acl_cps_key_get_obj_id (obj, BASE_ACL_COUNTER_TABLE_ID,
-                                     &table_id)) {
-        NAS_ACL_LOG_ERR ("Table ID is a mandatory key for Counter Create ");
-        return NAS_ACL_E_MISSING_KEY;
-    }
-    NAS_ACL_LOG_BRIEF ("%sSwitch Id: %d, Table Id: %ld",
-                        (is_rollbk_op) ? "** ROLLBACK **: " : "", switch_id, table_id);
 
     if (nas_acl_cps_key_get_obj_id (obj, BASE_ACL_COUNTER_ID, &counter_id)) {
         id_passed_in = true;
@@ -336,6 +377,26 @@ t_std_error nas_acl_counter_create (cps_api_object_t obj,
 
     try {
         nas_acl_switch& s    = nas_acl_get_switch (switch_id);
+        if (!nas_acl_cps_key_get_obj_id (obj, BASE_ACL_COUNTER_TABLE_ID,
+                                         &table_id)) {
+            cps_api_object_attr_t tbl_name_attr = cps_api_get_key_data(obj,
+                                                    BASE_ACL_COUNTER_TABLE_NAME);
+            if (tbl_name_attr == nullptr) {
+                NAS_ACL_LOG_ERR ("No Table ID or Name found for Counter Create ");
+                return NAS_ACL_E_MISSING_KEY;
+            }
+            char* tbl_name = (char*)cps_api_object_attr_data_bin(tbl_name_attr);
+            nas_acl_table* table_p = s.find_table_by_name(tbl_name);
+            if (table_p == nullptr) {
+                NAS_ACL_LOG_ERR("No Table with name %s was found", tbl_name);
+                return NAS_ACL_E_MISSING_KEY;
+            }
+            table_id = table_p->table_id();
+        }
+
+        NAS_ACL_LOG_BRIEF ("%sSwitch Id: %d, Table Id: %ld",
+                            (is_rollbk_op) ? "** ROLLBACK **: " : "", switch_id, table_id);
+
         nas_acl_table& table = s.get_table (table_id);
 
         if (id_passed_in) {
@@ -359,6 +420,18 @@ t_std_error nas_acl_counter_create (cps_api_object_t obj,
                     auto counter_type = cps_api_object_attr_data_u32 (it.attr);
                     NAS_ACL_LOG_DETAIL ("Counter type: %d", counter_type);
                     tmp_counter.set_type (counter_type);
+                    break;
+                }
+                case BASE_ACL_COUNTER_NAME:
+                {
+                    char* name = (char*)cps_api_object_attr_data_bin(it.attr);
+                    nas_acl_counter_t* counter_p = s.find_counter_by_name(table_id, name);
+                    if (counter_p != nullptr) {
+                        NAS_ACL_LOG_ERR("Counter %s already exists", name);
+                        return NAS_ACL_E_DUPLICATE;
+                    }
+                    NAS_ACL_LOG_DETAIL ("Counter Name: %s", name);
+                    tmp_counter.set_counter_name(name);
                     break;
                 }
                 case BASE_ACL_COUNTER_NPU_ID_LIST:
@@ -436,22 +509,48 @@ static t_std_error nas_acl_counter_delete (cps_api_object_t obj,
         NAS_ACL_LOG_ERR ("Switch ID is a mandatory key for Counter Delete ");
         return NAS_ACL_E_MISSING_KEY;
     }
-    if (!nas_acl_cps_key_get_obj_id (obj, BASE_ACL_COUNTER_TABLE_ID,
-                                     &table_id)) {
-        NAS_ACL_LOG_ERR ("Table ID is a mandatory key for Counter Delete ");
-        return NAS_ACL_E_MISSING_KEY;
-    }
-    if (!nas_acl_cps_key_get_obj_id (obj, BASE_ACL_COUNTER_ID, &counter_id)) {
-        NAS_ACL_LOG_ERR ("Counter ID is a mandatory key for Counter Delete");
-        return NAS_ACL_E_MISSING_KEY;
-    }
-
-    NAS_ACL_LOG_BRIEF ("%sSwitch Id: %d, Table Id: %ld, Counter Id: %ld",
-                       (is_rollbk_op) ? "** ROLLBACK **: " : "", switch_id,
-                       table_id, counter_id);
 
     try {
         nas_acl_switch& s    = nas_acl_get_switch (switch_id);
+
+        if (!nas_acl_cps_key_get_obj_id (obj, BASE_ACL_COUNTER_TABLE_ID,
+                                         &table_id)) {
+            cps_api_object_attr_t tbl_name_attr = cps_api_get_key_data(obj,
+                                                    BASE_ACL_COUNTER_TABLE_NAME);
+            if (tbl_name_attr == nullptr) {
+                NAS_ACL_LOG_ERR ("No Table ID or Name found for Counter Delete ");
+                return NAS_ACL_E_MISSING_KEY;
+            }
+            char* tbl_name = (char*)cps_api_object_attr_data_bin(tbl_name_attr);
+            nas_acl_table* table_p = s.find_table_by_name(tbl_name);
+            if (table_p == nullptr) {
+                NAS_ACL_LOG_ERR("No Table with name %s was found", tbl_name);
+                return NAS_ACL_E_MISSING_KEY;
+            }
+            table_id = table_p->table_id();
+        }
+
+        if (!nas_acl_cps_key_get_obj_id (obj, BASE_ACL_COUNTER_ID, &counter_id)) {
+            cps_api_object_attr_t cnt_name_attr = cps_api_get_key_data(obj,
+                                                            BASE_ACL_COUNTER_NAME);
+            if (cnt_name_attr == nullptr) {
+                NAS_ACL_LOG_ERR ("No Counter ID of Name found for Counter Delete");
+                return NAS_ACL_E_MISSING_KEY;
+            }
+            char* cnt_name = (char*)cps_api_object_attr_data_bin(cnt_name_attr);
+            nas_acl_counter_t* counter_p = s.find_counter_by_name(table_id, cnt_name);
+            if (counter_p == nullptr) {
+                NAS_ACL_LOG_ERR("No Counter with name %s was found", cnt_name);
+                return NAS_ACL_E_MISSING_KEY;
+            }
+            counter_id = counter_p->counter_id();
+        }
+
+        NAS_ACL_LOG_BRIEF ("%sSwitch Id: %d, Table Id: %ld, Counter Id: %ld",
+                           (is_rollbk_op) ? "** ROLLBACK **: " : "", switch_id,
+                           table_id, counter_id);
+
+
         nas_acl_counter_t& counter = s.get_counter (table_id, counter_id);
 
         if (is_rollbk_op == false) {

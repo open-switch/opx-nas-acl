@@ -63,6 +63,8 @@ struct entry_key_t {
     bool has_entry_id;
     BASE_ACL_MATCH_TYPE_t  ftype;
     bool has_match_type;
+    nas_obj_id_t  udf_group_id;
+    bool has_udf_match;
     BASE_ACL_ACTION_TYPE_t  atype;
     bool has_action_type;
 };
@@ -77,6 +79,8 @@ struct entry_op_key_t {
     struct {
         bool is_match_type;
         uint32_t type;
+        bool is_udf_match;
+        nas_obj_id_t udf_grp_id;
     };
 };
 
@@ -132,6 +136,21 @@ nas_acl_fill_entry_attr_info (cps_api_object_t obj, const nas_acl_entry& entry,
 
     if (!nas_acl_fill_entry_npu_list (obj, entry, explicit_npu_list)) {
         return false;
+    }
+
+    if (entry.entry_name() != nullptr) {
+        if (!cps_api_object_attr_add(obj, BASE_ACL_ENTRY_NAME, entry.entry_name(),
+                                     strlen(entry.entry_name()) + 1)) {
+            return false;
+        }
+    }
+
+    const char* tbl_name = entry.table_name();
+    if (tbl_name != nullptr) {
+        if (!cps_api_object_attr_add(obj, BASE_ACL_ENTRY_TABLE_NAME, tbl_name,
+                                     strlen(tbl_name) + 1)) {
+            return false;
+        }
     }
 
     return true;
@@ -347,7 +366,7 @@ static t_std_error _cps_fill_action_info (cps_api_get_params_t *param,
     return NAS_ACL_E_NONE;
 }
 
-static entry_key_t _cps_extract_key (cps_api_object_t obj)
+static entry_key_t _cps_extract_key (cps_api_object_t obj, bool create)
 {
     nas_switch_id_t switch_id;
     bool has_switch_id = nas_acl_cps_key_get_switch_id (obj, NAS_ACL_SWITCH_ATTR,
@@ -357,20 +376,67 @@ static entry_key_t _cps_extract_key (cps_api_object_t obj)
     bool has_table_id = nas_acl_cps_key_get_obj_id (obj, BASE_ACL_ENTRY_TABLE_ID,
             &table_id);
 
-    nas_obj_id_t  entry_id;
-    bool has_entry_id = nas_acl_cps_key_get_obj_id (obj, BASE_ACL_ENTRY_ID,
-            &entry_id);
+    if (has_switch_id && !has_table_id) {
+        nas_acl_switch& sw = nas_acl_get_switch(switch_id);
+        cps_api_object_attr_t name_attr = cps_api_get_key_data(obj, BASE_ACL_ENTRY_TABLE_NAME);
+        if (name_attr != nullptr) {
+            char* table_name = (char*)cps_api_object_attr_data_bin(name_attr);
+            nas_acl_table* table_p = sw.find_table_by_name(table_name);
+            if (table_p == nullptr) {
+                throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
+                            "ACL Table with specific name not found"};
+            }
+            has_table_id = true;
+            table_id = table_p->table_id();
+        }
+    }
 
     BASE_ACL_MATCH_TYPE_t  ftype;
     bool has_match_type = nas_acl_cps_key_get_u32 (obj, BASE_ACL_ENTRY_MATCH_TYPE,
             (uint32_t*)&ftype);
 
+    bool has_udf_match = false;
+    nas_obj_id_t udf_group_id = 0;
+    if (has_match_type && ftype == BASE_ACL_MATCH_TYPE_UDF) {
+        has_udf_match = nas_acl_cps_key_get_obj_id(obj,
+                            BASE_ACL_ENTRY_MATCH_UDF_VALUE_UDF_GROUP_ID,
+                            &udf_group_id);
+    }
+
     BASE_ACL_ACTION_TYPE_t  atype;
     bool has_action_type = nas_acl_cps_key_get_u32 (obj, BASE_ACL_ENTRY_ACTION_TYPE,
             (uint32_t*)&atype);
 
+    if (has_match_type || has_action_type) {
+        create = false;
+    }
+
+    nas_obj_id_t  entry_id;
+    bool has_entry_id = nas_acl_cps_key_get_obj_id (obj, BASE_ACL_ENTRY_ID,
+            &entry_id);
+
+    if (has_switch_id && has_table_id && !has_entry_id) {
+        nas_acl_switch& sw = nas_acl_get_switch(switch_id);
+        cps_api_object_attr_t name_attr = cps_api_get_key_data(obj, BASE_ACL_ENTRY_NAME);
+        if (name_attr != nullptr) {
+            char* entry_name = (char*)cps_api_object_attr_data_bin(name_attr);
+            nas_acl_entry* entry_p = sw.find_entry_by_name(table_id, entry_name);
+            if (!create && entry_p == nullptr) {
+                throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
+                            "ACL Entry with specific name not found"};
+            } else if (create && entry_p != nullptr) {
+                throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
+                            "ACL Entry with specific name already exists"};
+            }
+            if (!create) {
+                has_entry_id = true;
+                entry_id = entry_p->entry_id();
+            }
+        }
+    }
+
     return {switch_id, has_switch_id, table_id, has_table_id, entry_id, has_entry_id,
-            ftype, has_match_type, atype, has_action_type};
+            ftype, has_match_type, udf_group_id, has_udf_match, atype, has_action_type};
 }
 
 t_std_error
@@ -379,9 +445,10 @@ nas_acl_get_entry (cps_api_get_params_t *param, size_t index,
 {
     t_std_error  rc = NAS_ACL_E_NONE;
 
-    auto key = _cps_extract_key (filter_obj);
 
     try {
+        auto key = _cps_extract_key (filter_obj, false);
+
         if (!key.has_switch_id) {
             /* No keys provided */
             rc = nas_acl_get_entry_info_all (param, index);
@@ -435,9 +502,9 @@ nas_acl_get_entry (cps_api_get_params_t *param, size_t index,
     return (rc);
 }
 
-static entry_op_key_t _cps_op_key_extract (cps_api_object_t obj)
+static entry_op_key_t _cps_op_key_extract (cps_api_object_t obj, bool create)
 {
-    auto key = _cps_extract_key (obj);
+    auto key = _cps_extract_key (obj, create);
 
     if (!key.has_switch_id) {
         throw nas::base_exception {NAS_ACL_E_MISSING_KEY, __PRETTY_FUNCTION__,
@@ -454,8 +521,8 @@ static entry_op_key_t _cps_op_key_extract (cps_api_object_t obj)
     if (key.has_entry_id) {
         if (key.has_match_type) {
              if (key.ftype == BASE_ACL_MATCH_TYPE_UDF) {
-                 throw nas::base_exception {NAS_ACL_E_UNSUPPORTED, __PRETTY_FUNCTION__,
-                                "Modification on UDF filter is not supported"};
+                return {s,t,true, key.entry_id, true,
+                        {true, (uint32_t)(key.ftype), key.has_udf_match, key.udf_group_id}};
              }
              return {s,t,true, key.entry_id, true,{true, (uint32_t)(key.ftype)}};
         }
@@ -490,8 +557,13 @@ static void  _cps_entry_incr_upd (cps_api_object_t       obj,
         NAS_ACL_LOG_BRIEF ("match_type_val: %d (%s)", ftype,
                             nas_acl_filter_t::type_name (ftype));
 
+        size_t udf_offset = 0;
+        if (op_key.is_udf_match) {
+            udf_offset = old_entry.get_table().get_udf_group_pos(op_key.udf_grp_id);
+        }
+
         if (op != cps_api_oper_CREATE) {
-            filter_p = &(old_entry.get_filter (ftype, 0));
+            filter_p = &(old_entry.get_filter (ftype, udf_offset));
         }
         if (op == cps_api_oper_DELETE) {
             new_entry.remove_filter(ftype, filter_p->filter_offset());
@@ -581,6 +653,13 @@ static bool _cps_parse_entry_obj (cps_api_object_t obj, nas_acl_entry& tmp_entry
             break;
         }
 
+        case BASE_ACL_ENTRY_NAME:
+        {
+            char* name = (char*)cps_api_object_attr_data_bin(it.attr);
+            tmp_entry.set_entry_name(name);
+            break;
+        }
+
         case BASE_ACL_ENTRY_MATCH:
             nas_acl_set_match_list (obj, it, tmp_entry);
             break;
@@ -658,7 +737,7 @@ static t_std_error nas_acl_entry_create (cps_api_object_t obj,
                                          bool             is_rollbk_op) noexcept
 {
     try {
-        auto op_key = _cps_op_key_extract (obj);
+        auto op_key = _cps_op_key_extract (obj, true);
 
         if (op_key.is_incr_upd) {
             // This is not a new ACL entry create.
@@ -741,7 +820,7 @@ static t_std_error nas_acl_entry_modify (cps_api_object_t obj,
                                          bool             is_rollbk_op) noexcept
 {
     try {
-        auto op_key = _cps_op_key_extract (obj);
+        auto op_key = _cps_op_key_extract (obj, false);
 
         if (!op_key.has_eid) {
             NAS_ACL_LOG_ERR ("Entry ID is a mandatory key for Modify operation");
@@ -803,7 +882,7 @@ static t_std_error nas_acl_entry_delete (cps_api_object_t obj,
                                          bool             is_rollbk_op) noexcept
 {
     try {
-        auto op_key = _cps_op_key_extract (obj);
+        auto op_key = _cps_op_key_extract (obj, false);
 
         if (!op_key.has_eid) {
             NAS_ACL_LOG_ERR ("Entry ID is a mandatory key for Delete operation");

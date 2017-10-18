@@ -25,7 +25,6 @@
 #include "hal_if_mapping.h"
 #include "nas_if_utils.h"
 #include "nas_vlan_consts.h"
-#include "nas_qos_consts.h"
 #include "nas_acl_action.h"
 #include "nas_acl_log.h"
 #include "nas_acl_utl.h"
@@ -34,8 +33,7 @@
 #include <inttypes.h>
 
 static const
-std::unordered_map <BASE_ACL_PACKET_ACTION_TYPE_t, const char*, std::hash<int>>
-_pkt_action_name_map = {
+auto& _pkt_action_name_map = *new std::unordered_map <BASE_ACL_PACKET_ACTION_TYPE_t, const char*, std::hash<int>> {
 
     {BASE_ACL_PACKET_ACTION_TYPE_DROP,         "DROP"},
     {BASE_ACL_PACKET_ACTION_TYPE_FORWARD,      "FORWARD"},
@@ -45,6 +43,15 @@ _pkt_action_name_map = {
     {BASE_ACL_PACKET_ACTION_TYPE_COPY_TO_CPU_AND_FORWARD,  "COPY-TO-CPU-AND-FORWARD"},
     {BASE_ACL_PACKET_ACTION_TYPE_COPY_TO_CPU_CANCEL_AND_DROP,  "CPU-CANCEL-AND-DROP"},
     {BASE_ACL_PACKET_ACTION_TYPE_COPY_TO_CPU_CANCEL_AND_FORWARD,  "CPU-CANCEL-AND-FORWARD"},
+};
+
+static const
+auto& _pkt_color_name_map =
+    *new std::unordered_map <BASE_ACL_PACKET_COLOR_t, const char*, std::hash<int>> {
+
+    {BASE_ACL_PACKET_COLOR_GREEN,         "GREEN"},
+    {BASE_ACL_PACKET_COLOR_YELLOW,        "YELLOW"},
+    {BASE_ACL_PACKET_COLOR_RED,           "RED"},
 };
 
 nas_acl_action_t::nas_acl_action_t (BASE_ACL_ACTION_TYPE_t t)
@@ -367,6 +374,28 @@ void nas_acl_action_t::set_pkt_action_val (const nas_acl_common_data_list_t& val
             std::string {"Invalid Pkt action "} + std::to_string (_a_info.pkt_action)};
     }
 }
+
+void nas_acl_action_t::get_pkt_color_val (nas_acl_common_data_list_t& val_list) const
+{
+    nas_acl_common_data_t pkt_action;
+
+    pkt_action.u32 = _a_info.pkt_color;
+
+    val_list.push_back (pkt_action);
+}
+
+void nas_acl_action_t::set_pkt_color_val (const nas_acl_common_data_list_t& val_list)
+{
+    _a_info.values_type = NDI_ACL_ACTION_PKT_COLOR;
+    _a_info.pkt_color = (BASE_ACL_PACKET_COLOR_t) val_list.at(0).u32;
+
+    auto it = _pkt_color_name_map.find (_a_info.pkt_color);
+    if (it == _pkt_color_name_map.end()) {
+        throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
+            std::string {"Invalid Pkt color "} + std::to_string (_a_info.pkt_color)};
+    }
+}
+
 
 bool nas_acl_action_t::_ndi_copy_one_obj_id (ndi_acl_entry_action_t& ndi_action,
                                              npu_id_t npu_id) const

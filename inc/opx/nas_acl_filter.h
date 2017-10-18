@@ -48,7 +48,9 @@ class nas_acl_filter_t
             return (f_type == BASE_ACL_MATCH_TYPE_IN_PORTS ||
                     f_type == BASE_ACL_MATCH_TYPE_IN_PORT ||
                     f_type == BASE_ACL_MATCH_TYPE_IN_INTFS ||
-                    f_type == BASE_ACL_MATCH_TYPE_IN_INTF);
+                    f_type == BASE_ACL_MATCH_TYPE_IN_INTF ||
+                    f_type == BASE_ACL_MATCH_TYPE_SRC_PORT ||
+                    f_type == BASE_ACL_MATCH_TYPE_SRC_INTF);
         }
 
         const char* name () const noexcept;
@@ -75,6 +77,7 @@ class nas_acl_filter_t
         void get_filter_ifindex_list (nas_acl_common_data_list_t& val_list) const;
         void get_filter_ifindex (nas_acl_common_data_list_t& val_list) const;
         void get_udf_filter_val (nas_acl_common_data_list_t& val_list) const;
+        void get_obj_id_list_filter_val(nas_acl_common_data_list_t& val_list) const;
 
         const nas::ifindex_list_t& get_filter_if_list () const noexcept;
         nas::npu_set_t get_npu_list () const;
@@ -94,14 +97,16 @@ class nas_acl_filter_t
         void set_filter_ifindex_list (const nas_acl_common_data_list_t& val_list);
         void set_filter_ifindex (const nas_acl_common_data_list_t& val_list);
         void set_udf_filter_val (const nas_acl_common_data_list_t& val_list);
-
-        nas_obj_id_t get_udf_group_from_pos(size_t udf_grp_pos) const;
-        size_t get_udf_group_pos(nas_obj_id_t udf_grp_id) const;
+        void set_obj_id_list_filter_val(const nas_acl_common_data_list_t& val_list);
 
         bool copy_filter_ndi (ndi_acl_entry_filter_t* ndi_filter_p,
                               npu_id_t npu_id, nas::mem_alloc_helper_t& m) const;
 
         bool operator!= (const nas_acl_filter_t& second) const noexcept;
+
+        const std::vector<nas_obj_id_t>& range_id_list() const noexcept {return _range_oid_list;}
+        bool is_range() const noexcept
+        {return filter_type() == BASE_ACL_MATCH_TYPE_RANGE_CHECK;}
 
     private:
         bool _ndi_copy_one_obj_id(ndi_acl_entry_filter_t* ndi_filter_p,
@@ -118,6 +123,9 @@ class nas_acl_filter_t
         nas::ifindex_list_t   _ifindex_list;
 
         const nas_acl_table* _table_p = nullptr;
+
+        // Value for ACL Range filter
+        std::vector<nas_obj_id_t> _range_oid_list;
 };
 
 inline const nas::ifindex_list_t&

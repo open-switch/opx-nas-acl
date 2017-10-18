@@ -50,6 +50,7 @@ class nas_acl_table final : public nas::base_obj_t
 {
     public:
         typedef std::set<BASE_ACL_MATCH_TYPE_t> filter_set_t;
+        typedef std::set<BASE_ACL_ACTION_TYPE_t> action_set_t;
         typedef std::vector<nas_obj_id_t> udf_group_list_t;
 
         ////// Constructor/Destructor /////
@@ -68,6 +69,12 @@ class nas_acl_table final : public nas::base_obj_t
                    // Copy filter-set to c style array
         void       allowed_filters_c_cpy (size_t filter_count,
                                           BASE_ACL_MATCH_TYPE_t* filter_list) const noexcept;
+        bool        is_action_allowed (BASE_ACL_ACTION_TYPE_t action_id) const noexcept;
+        size_t      allowed_actions_count () const noexcept;
+        const action_set_t& allowed_actions () const noexcept {return _allowed_actions;}
+                   // Copy action-set to c style array
+        void       allowed_actions_c_cpy (size_t action_count,
+                                          BASE_ACL_ACTION_TYPE_t* action_list) const noexcept;
         bool         is_udf_group_in_list(nas_obj_id_t udf_grp_id) const noexcept;
         size_t       udf_group_list_count() const noexcept {return _udf_group_list.size();}
         const udf_group_list_t& udf_group_list() const noexcept {return _udf_group_list;}
@@ -79,7 +86,12 @@ class nas_acl_table final : public nas::base_obj_t
         void set_table_size(uint_t size);
         void set_priority (ndi_acl_priority_t p);
         void set_allowed_filter (uint_t filter_id);
+        void set_allowed_action (uint_t action_id);
         void set_udf_group_id (nas_obj_id_t udf_grp_id);
+        void set_table_name(const char* name);
+
+        nas_obj_id_t get_udf_group_from_pos(size_t udf_grp_pos) const;
+        size_t get_udf_group_pos(nas_obj_id_t udf_grp_id) const;
 
         // Override all base class routines that handle NPU change request
         // to disallow change when table has entries
@@ -103,13 +115,23 @@ class nas_acl_table final : public nas::base_obj_t
         bool is_leaf_attr (nas_attr_id_t attr_id) override;
         bool push_leaf_attr_to_npu (nas_attr_id_t attr_id,
                                     npu_id_t npu_id) override;
+        const char* table_name() const
+        {
+            if (_table_name.size() > 0) {
+                return _table_name.c_str();
+            } else {
+                return nullptr;
+            }
+        }
 
     private:
         nas_obj_id_t          _table_id = 0;
+        std::string           _table_name;
 
         // Create-only attributes
         BASE_ACL_STAGE_t   _stage = BASE_ACL_STAGE_INGRESS;
         filter_set_t       _allowed_filters;
+        action_set_t       _allowed_actions;
         uint_t             _size = 0;
         udf_group_list_t   _udf_group_list;
 
@@ -132,4 +154,8 @@ inline size_t nas_acl_table::allowed_filters_count () const noexcept
     return _allowed_filters.size();
 }
 
+inline size_t nas_acl_table::allowed_actions_count () const noexcept
+{
+    return _allowed_actions.size();
+}
 #endif

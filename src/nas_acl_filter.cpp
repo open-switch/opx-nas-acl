@@ -51,7 +51,8 @@ nas_acl_filter_t::nas_acl_filter_t (const nas_acl_table* table, BASE_ACL_MATCH_T
         // The list can grow beyond this if required
         _ifindex_list.reserve(nas_acl_filter_t::port_count_estm);
     }
-    if (t == BASE_ACL_MATCH_TYPE_NEIGHBOR_DST_HIT ||
+    if (t == BASE_ACL_MATCH_TYPE_FDB_DST_HIT ||
+        t == BASE_ACL_MATCH_TYPE_NEIGHBOR_DST_HIT ||
         t == BASE_ACL_MATCH_TYPE_ROUTE_DST_HIT) {
         _f_info.values_type = NDI_ACL_FILTER_BOOL;
     }
@@ -354,7 +355,11 @@ void nas_acl_filter_t::get_udf_filter_val(nas_acl_common_data_list_t& val_list) 
     size_t byte_count;
     uint8_t *byte_list;
 
-    udf_group_id.obj_id = get_udf_group_from_pos(_f_info.udf_seq_no);
+    if (_table_p == nullptr) {
+        throw nas::base_exception {NAS_ACL_E_FAIL, __PRETTY_FUNCTION__,
+            "ACL Table member was not initiated"};
+    }
+    udf_group_id.obj_id = _table_p->get_udf_group_from_pos(_f_info.udf_seq_no);
 
     byte_count = _f_info.data.values.ndi_u8list.byte_count;
     byte_list = _f_info.data.values.ndi_u8list.byte_list;
@@ -375,8 +380,12 @@ void nas_acl_filter_t::set_udf_filter_val(const nas_acl_common_data_list_t& val_
     size_t byte_cnt;
     uint8_t *byte_buf;
 
+    if (_table_p == nullptr) {
+        throw nas::base_exception {NAS_ACL_E_FAIL, __PRETTY_FUNCTION__,
+            "ACL Table member was not initiated"};
+    }
     _f_info.values_type = NDI_ACL_FILTER_U8LIST;
-    _f_info.udf_seq_no = get_udf_group_pos(val_list[0].obj_id);
+    _f_info.udf_seq_no = _table_p->get_udf_group_pos(val_list[0].obj_id);
     byte_cnt = val_list[1].bytes.size();
     byte_buf = (uint8_t *)calloc(byte_cnt, 1);
     if (byte_buf != NULL) {
@@ -391,6 +400,19 @@ void nas_acl_filter_t::set_udf_filter_val(const nas_acl_common_data_list_t& val_
         _f_info.mask.values.ndi_u8list.byte_count = byte_cnt;
         _f_info.mask.values.ndi_u8list.byte_list = byte_buf;
     }
+}
+
+void nas_acl_filter_t::set_obj_id_list_filter_val (const nas_acl_common_data_list_t& data_list)
+{
+    _f_info.values_type = NDI_ACL_FILTER_OBJ_ID_LIST;
+    _range_oid_list = std::move(data_list.at(0).obj_id_list);
+}
+
+void nas_acl_filter_t::get_obj_id_list_filter_val (nas_acl_common_data_list_t& data_list) const
+{
+    nas_acl_common_data_t data {};
+    data.obj_id_list = std::move(_range_oid_list);
+    data_list.push_back (data);
 }
 
 bool nas_acl_filter_t::_ndi_copy_one_obj_id(ndi_acl_entry_filter_t* ndi_filter_p,
@@ -489,6 +511,11 @@ bool nas_acl_filter_t::operator!= (const nas_acl_filter_t& rhs) const noexcept
         _f_info.values_type == NDI_ACL_FILTER_PORT)
     {
         if (_ifindex_list != rhs._ifindex_list) {
+            return true;
+        }
+    }
+    else if (_f_info.values_type == NDI_ACL_FILTER_OBJ_ID_LIST) {
+        if (_range_oid_list != rhs._range_oid_list) {
             return true;
         }
     }
@@ -597,31 +624,4 @@ void nas_acl_filter_t::dbg_dump () const
         default:
             break;
     }
-}
-
-nas_obj_id_t nas_acl_filter_t::get_udf_group_from_pos(size_t udf_grp_pos) const
-{
-    if (_table_p == nullptr) {
-        throw nas::base_exception {NAS_ACL_E_FAIL, __PRETTY_FUNCTION__,
-            "ACL Table member was not initiated"};
-    }
-    return _table_p->udf_group_list().at(udf_grp_pos);
-}
-
-size_t nas_acl_filter_t::get_udf_group_pos(nas_obj_id_t udf_grp_id) const
-{
-    if (_table_p == nullptr) {
-        throw nas::base_exception {NAS_ACL_E_FAIL, __PRETTY_FUNCTION__,
-            "ACL Table member was not initiated"};
-    }
-    size_t idx = 0;
-    for (auto grp_id: _table_p->udf_group_list()) {
-        if (grp_id == udf_grp_id) {
-            return idx;
-        }
-        idx ++;
-    }
-
-    throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
-        std::string {"Invalid UDF Group ID "} + std::to_string (udf_grp_id)};
 }

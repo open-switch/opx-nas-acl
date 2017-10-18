@@ -80,6 +80,10 @@ nas_acl_cps_api_write_internal (void                         *context,
             save_prev = false;
             break;
 
+        case BASE_ACL_RANGE_OBJ:
+            p_op_map = nas_acl_get_range_operation_map (op);
+            break;
+
         default:
             return NAS_ACL_E_UNSUPPORTED;
     }
@@ -142,6 +146,10 @@ nas_acl_cps_api_read (void                 *context,
         case BASE_ACL_STATS_OBJ:
             rc = nas_acl_get_counter (param, index, filter_obj,
                                       (BASE_ACL_OBJECTS_t) sub_category);
+            break;
+
+        case BASE_ACL_RANGE_OBJ:
+            rc = nas_acl_get_range(param, index, filter_obj);
             break;
 
         default:

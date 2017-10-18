@@ -67,6 +67,7 @@ typedef struct _nas_acl_common_data_t {
     nas::ifindex_list_t      ifindex_list;
     nas::ndi_obj_id_table_t  ndi_obj_id_table;
     std::vector<uint8_t>     bytes;
+    std::vector<nas_obj_id_t> obj_id_list;
 } nas_acl_common_data_t;
 
 typedef std::vector<nas_acl_common_data_t> nas_acl_common_data_list_t;
@@ -86,6 +87,7 @@ typedef enum NAS_ACL_DATA_TYPE_t {
     NAS_ACL_DATA_EMBEDDED,
     NAS_ACL_DATA_OPAQUE,
     NAS_ACL_DATA_EMBEDDED_LIST,
+    NAS_ACL_DATA_OBJ_ID_LIST,
 } NAS_ACL_DATA_TYPE_t;
 
 inline constexpr nas_switch_id_t NAS_ACL_DEFAULT_SWITCH_ID () { return 0;}

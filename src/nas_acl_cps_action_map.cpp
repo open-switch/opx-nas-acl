@@ -31,7 +31,7 @@
     nas_acl_action_get_fn_ptr_t get_fn;
     nas_acl_action_set_fn_ptr_t set_fn;
  */
-static const nas_acl_action_map_t _action_map =
+static const auto& _action_map = *new nas_acl_action_map_t
 {
     {BASE_ACL_ACTION_TYPE_PACKET_ACTION,
         {
@@ -589,6 +589,22 @@ static const nas_acl_action_map_t _action_map =
             {},
             &nas_acl_action_t::get_u32_action_val,
             &nas_acl_action_t::set_u32_action_val,
+        },
+    },
+
+    {BASE_ACL_ACTION_TYPE_SET_PACKET_COLOR,
+        {
+            "ACTION_TYPE_SET_PACKET_COLOR",
+            {
+                BASE_ACL_ENTRY_ACTION_SET_PACKET_COLOR_VALUE,
+                NAS_ACL_DATA_U32,
+                sizeof (uint32_t),
+                NAS_ACL_ATTR_MODE_MANDATORY,
+                {},
+            },
+            {},
+            &nas_acl_action_t::get_pkt_color_val,
+            &nas_acl_action_t::set_pkt_color_val,
         },
     },
 };

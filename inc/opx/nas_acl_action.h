@@ -126,6 +126,7 @@ class nas_acl_action_t
         void set_pkt_action_val (const nas_acl_common_data_list_t& data_list);
         void set_ndi_counter_ids (const nas::ndi_obj_id_table_t & ndi_obj_id_table);
         void set_opaque_data_nexthop_val (const nas_acl_common_data_list_t& data_list);
+        void set_pkt_color_val (const nas_acl_common_data_list_t& data_list);
 
         void get_u8_action_val (nas_acl_common_data_list_t& data_list) const;
         void get_u16_action_val (nas_acl_common_data_list_t& data_list) const;
@@ -140,6 +141,7 @@ class nas_acl_action_t
         void get_action_ifindex_list (nas_acl_common_data_list_t& data_list) const;
         void get_pkt_action_val (nas_acl_common_data_list_t& val_list) const;
         void get_opaque_data_nexthop_val (nas_acl_common_data_list_t& data_list) const;
+        void get_pkt_color_val (nas_acl_common_data_list_t& val_list) const;
 
         nas_obj_id_t  counter_id () const noexcept {return _nas_oid;}
 

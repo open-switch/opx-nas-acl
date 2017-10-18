@@ -44,6 +44,18 @@ nas_acl_table* nas_acl_switch::find_table (nas_obj_id_t tbl_id) noexcept
     return &it_tbl->second;
 }
 
+nas_acl_table* nas_acl_switch::find_table_by_name (const char* tbl_name) noexcept
+{
+    for (auto& tbl_item: _tables) {
+        const char* chk_name = tbl_item.second.table_name();
+        if (chk_name != nullptr && strcmp(chk_name, tbl_name) == 0) {
+            return &tbl_item.second;
+        }
+    }
+
+    return nullptr;
+}
+
 const nas_acl_switch::entry_list_t&
 nas_acl_switch::entry_list (nas_obj_id_t table_id) const
 {
@@ -95,6 +107,22 @@ nas_acl_entry* nas_acl_switch::find_entry (nas_obj_id_t tbl_id,
     return &it_entry->second;
 }
 
+nas_acl_entry* nas_acl_switch::find_entry_by_name (nas_obj_id_t tbl_id,
+                                                   const char* entry_name) noexcept
+{
+    auto it_tbl = _table_containers.find (tbl_id);
+    if (it_tbl == _table_containers.end ()) return nullptr;
+
+    for (auto& ent_item: it_tbl->second._acl_entries) {
+        const char* chk_name = ent_item.second.entry_name();
+        if (chk_name != nullptr && strcmp(chk_name, entry_name) == 0) {
+            return &ent_item.second;
+        }
+    }
+
+    return nullptr;
+}
+
 nas_acl_counter_t& nas_acl_switch::get_counter (nas_obj_id_t tbl_id,
                                                 nas_obj_id_t counter_id)
 {
@@ -126,6 +154,22 @@ nas_acl_counter_t* nas_acl_switch::find_counter (nas_obj_id_t tbl_id,
     if (it_cntr == counter_list.end()) return nullptr;
 
     return &it_cntr->second;
+}
+
+nas_acl_counter_t* nas_acl_switch::find_counter_by_name (nas_obj_id_t tbl_id,
+                                                         const char* counter_name) noexcept
+{
+    auto it_tbl = _table_containers.find (tbl_id);
+    if (it_tbl == _table_containers.end ()) return nullptr;
+
+    for (auto& cnt_item: it_tbl->second._acl_counters) {
+        const char* chk_name = cnt_item.second.counter_name();
+        if (chk_name != nullptr && strcmp(chk_name, counter_name) == 0) {
+            return &cnt_item.second;
+        }
+    }
+
+    return nullptr;
 }
 
 nas_acl_table& nas_acl_switch::save_table (nas_acl_table&& t) noexcept
@@ -389,4 +433,34 @@ nas_udf& nas_acl_switch::save_udf(nas_udf&& udf) noexcept
 void nas_acl_switch::remove_udf(nas_obj_id_t udf_id) noexcept
 {
     _udf_objs.erase(udf_id);
+}
+
+// Return pointer to ACl range object of given range id. Return NULL if no range
+// object found
+nas_acl_range* nas_acl_switch::find_acl_range (nas_obj_id_t range_id) noexcept
+{
+    auto range_itr = _range_objs.find (range_id);
+    if (range_itr == _range_objs.end ()) {
+        return nullptr;
+    }
+
+    return &range_itr->second;
+}
+
+nas_acl_range& nas_acl_switch::save_acl_range(nas_acl_range&& acl_range) noexcept
+{
+    auto it = _range_objs.find(acl_range.range_id());
+
+    if (it == _range_objs.end()) {
+        auto p = _range_objs.insert(std::make_pair(acl_range.range_id(), std::move(acl_range)));
+        return (p.first->second);
+    }
+
+    // Update existing ACL Range if present
+    return (it->second = std::move(acl_range));
+}
+
+void nas_acl_switch::remove_acl_range(nas_obj_id_t range_id) noexcept
+{
+    _range_objs.erase(range_id);
 }

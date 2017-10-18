@@ -31,13 +31,19 @@
 #include <inttypes.h>
 
 nas_acl_counter_t::nas_acl_counter_t (const nas_acl_table* table_p)
-    :nas::base_obj_t (&(table_p->get_switch())), _table_p (table_p)
+    :nas::base_obj_t (&(table_p->get_switch())), _table_p (table_p),
+     _counter_name("")
 {
 }
 
 nas_obj_id_t  nas_acl_counter_t::table_id() const noexcept
 {
     return _table_p->table_id();
+}
+
+const char*  nas_acl_counter_t::table_name() const noexcept
+{
+    return _table_p->table_name();
 }
 
 void nas_acl_counter_t::copy_table_npus ()
@@ -129,6 +135,11 @@ void nas_acl_counter_t::set_type(uint_t type, bool reset)
                   + std::to_string (t)};
             break;
     }
+}
+
+void nas_acl_counter_t::set_counter_name(const char* name)
+{
+    _counter_name = name;
 }
 
 bool nas_acl_counter_t::push_create_obj_to_npu (npu_id_t npu_id,

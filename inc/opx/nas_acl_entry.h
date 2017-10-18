@@ -28,6 +28,7 @@
 #include "nas_acl_filter.h"
 #include "nas_acl_action.h"
 #include "nas_acl_counter.h"
+#include "nas_acl_range.h"
 #include "nas_base_utils.h"
 #include "nas_ndi_obj_id_table.h"
 #include "nas_base_obj.h"
@@ -98,6 +99,7 @@ class nas_acl_entry final : public nas::base_obj_t
         /////// Accessors ////////
         const nas_acl_table&     get_table() const noexcept {return *_table_p;}
         nas_obj_id_t             table_id() const noexcept;
+        const char*              table_name() const noexcept;
         nas_obj_id_t             entry_id() const  noexcept {return _entry_id;}
         ndi_acl_priority_t       priority() const  noexcept {return _priority;}
 
@@ -115,6 +117,10 @@ class nas_acl_entry final : public nas::base_obj_t
         const nas_acl_counter_t* get_counter () const;
         nas_acl_counter_t* get_counter ();
 
+        bool is_range_enabled() const noexcept;
+        const std::vector<nas_obj_id_t>* range_id_list() const noexcept;
+        bool get_range_list(std::vector<nas_acl_range*>& range_list) const;
+
         bool is_npu_set (npu_id_t npu_id) const noexcept;
         bool following_table_npus  () const noexcept {return _following_table_npus;}
         void dbg_dump () const;
@@ -122,6 +128,7 @@ class nas_acl_entry final : public nas::base_obj_t
         //////// Modifiers ////////
         void set_entry_id (nas_obj_id_t id);
         void set_priority (ndi_acl_priority_t p);
+        void set_entry_name(const char* name);
         void add_filter (nas_acl_filter_t& filter, bool reset=true);
         void add_action (nas_acl_action_t& action, bool reset=true);
         void remove_filter (BASE_ACL_MATCH_TYPE_t ftype, size_t offset);
@@ -166,9 +173,18 @@ class nas_acl_entry final : public nas::base_obj_t
         void rollback_delete_attr_in_npu (const nas::attr_list_t&
                                           attr_hierarchy,
                                           npu_id_t npu_id) override;
+        const char* entry_name() const
+        {
+            if (_entry_name.size() > 0) {
+                return _entry_name.c_str();
+            } else {
+                return nullptr;
+            }
+        }
 
     private:
         nas_obj_id_t                 _entry_id = 0;
+        std::string                  _entry_name;
         const nas_acl_table*         _table_p; // Back pointer to table
         ndi_acl_priority_t           _priority = 0;
 
@@ -250,6 +266,20 @@ inline nas_obj_id_t nas_acl_entry::counter_id () const noexcept
 inline bool nas_acl_entry::is_counter_enabled () const noexcept
 {
     return (_alist.find(BASE_ACL_ACTION_TYPE_SET_COUNTER) != _alist.end());
+}
+
+inline const std::vector<nas_obj_id_t>* nas_acl_entry::range_id_list() const noexcept
+{
+    auto it = _flist.find({BASE_ACL_MATCH_TYPE_RANGE_CHECK, 0});
+    if (it != _flist.end()) {
+        return &it->second.range_id_list();
+    }
+    return nullptr;
+}
+
+inline bool nas_acl_entry::is_range_enabled () const noexcept
+{
+    return (_flist.find({BASE_ACL_MATCH_TYPE_RANGE_CHECK, 0}) != _flist.end());
 }
 
 #endif

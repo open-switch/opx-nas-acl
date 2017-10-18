@@ -28,6 +28,7 @@
 #include "nas_acl_counter.h"
 #include "nas_acl_entry.h"
 #include "nas_acl_table.h"
+#include "nas_acl_range.h"
 #include "nas_udf_group.h"
 #include "nas_udf_match.h"
 #include "nas_udf.h"
@@ -40,11 +41,13 @@ class nas_acl_switch : public nas::base_switch_t
         // Generated ACL Table IDs will wrap around after this max
         static const size_t NAS_ACL_TABLE_ID_MAX = 500;
         // Generated ACL Entry IDs will wrap around after this max
-        static const size_t NAS_ACL_ENTRY_ID_MAX  = 4094;
+        static const size_t NAS_ACL_ENTRY_ID_MAX  = 65536;
 
         static const size_t NAS_UDF_GROUP_ID_MAX = 16;
         static const size_t NAS_UDF_MATCH_ID_MAX = 1024;
         static const size_t NAS_UDF_ID_MAX = 1024;
+
+        static const size_t NAS_ACL_RANGE_ID_MAX = 65536;
 
         ///// Typedefs ///////
         typedef std::map<nas_obj_id_t, nas_acl_table> table_list_t;
@@ -61,6 +64,8 @@ class nas_acl_switch : public nas::base_switch_t
         typedef std::map<nas_obj_id_t, nas_udf_match> udf_match_list_t;
         typedef std::map<nas_obj_id_t, nas_udf> udf_list_t;
 
+        typedef std::map<nas_obj_id_t, nas_acl_range> range_list_t;
+
         ///// Constructor ////
         nas_acl_switch (nas_obj_id_t id): nas::base_switch_t (id) {};
 
@@ -68,6 +73,7 @@ class nas_acl_switch : public nas::base_switch_t
         // ACL Table Get
         nas_acl_table&        get_table (nas_obj_id_t tbl_id);
         nas_acl_table*        find_table (nas_obj_id_t tbl_id) noexcept;
+        nas_acl_table*        find_table_by_name(const char* tbl_name) noexcept;
         const table_list_t&   table_list () const noexcept {return _tables;}
 
         // ACL Entry Get
@@ -75,12 +81,16 @@ class nas_acl_switch : public nas::base_switch_t
                                          nas_obj_id_t entry_id);
         nas_acl_entry*        find_entry (nas_obj_id_t tbl_id,
                                           nas_obj_id_t entry_id) noexcept;
+        nas_acl_entry*        find_entry_by_name (nas_obj_id_t tbl_id,
+                                                  const char* entry_name) noexcept;
         const entry_list_t&   entry_list (nas_obj_id_t tbl_id) const;
 
         nas_acl_counter_t&    get_counter (nas_obj_id_t tbl_id,
                                            nas_obj_id_t counter_id);
         nas_acl_counter_t*    find_counter (nas_obj_id_t tbl_id,
                                             nas_obj_id_t counter_id) noexcept;
+        nas_acl_counter_t*    find_counter_by_name (nas_obj_id_t tbl_id,
+                                                    const char* counter_name) noexcept;
         const counter_list_t& counter_list (nas_obj_id_t tbl_id) const;
 
         nas_udf_group*        find_udf_group(nas_obj_id_t udf_grp_id) noexcept;
@@ -89,6 +99,9 @@ class nas_acl_switch : public nas::base_switch_t
         const udf_group_list_t& udf_group_list() const noexcept {return _udf_groups;}
         const udf_match_list_t& udf_match_list() const noexcept {return _udf_matches;}
         const udf_list_t& udf_obj_list() const noexcept {return _udf_objs;}
+
+        nas_acl_range*        find_acl_range(nas_obj_id_t range_id) noexcept;
+        const range_list_t& range_obj_list() const noexcept {return _range_objs;}
 
         ///////// Modifiers //////////
         ///// ACL Table list
@@ -143,6 +156,16 @@ class nas_acl_switch : public nas::base_switch_t
 
         nas_udf& save_udf(nas_udf&& udf) noexcept;
         void remove_udf(nas_obj_id_t id) noexcept;
+
+        nas_obj_id_t alloc_acl_range_id() {return _range_id_gen.alloc_id();}
+        bool reserve_acl_range_id(nas_obj_id_t id) noexcept
+        {return _range_id_gen.reserve_id(id);}
+        void release_acl_range_id(nas_obj_id_t range_id) noexcept
+        {_range_id_gen.release_id(range_id);}
+
+        nas_acl_range& save_acl_range(nas_acl_range&& acl_range) noexcept;
+        void remove_acl_range(nas_obj_id_t id) noexcept;
+
     private:
 
         struct acl_table_container_t
@@ -168,6 +191,10 @@ class nas_acl_switch : public nas::base_switch_t
         nas::id_generator_t     _udf_group_id_gen {NAS_UDF_GROUP_ID_MAX};
         nas::id_generator_t     _udf_match_id_gen {NAS_UDF_MATCH_ID_MAX};
         nas::id_generator_t     _udf_id_gen {NAS_UDF_ID_MAX};
+
+        range_list_t              _range_objs;
+
+        nas::id_generator_t     _range_id_gen {NAS_ACL_RANGE_ID_MAX};
 };
 
 #endif

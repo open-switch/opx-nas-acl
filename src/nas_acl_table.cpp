@@ -28,7 +28,7 @@
 #include <inttypes.h>
 
 nas_acl_table::nas_acl_table (nas_acl_switch* switch_p)
-           : nas::base_obj_t (switch_p)
+           : nas::base_obj_t (switch_p), _table_name("")
 {
 }
 
@@ -41,6 +41,15 @@ nas_acl_switch& nas_acl_table::get_switch() const noexcept
 bool nas_acl_table::is_filter_allowed (BASE_ACL_MATCH_TYPE_t filter_id) const noexcept
 {
     return (_allowed_filters.find(filter_id) != _allowed_filters.end());
+}
+
+bool nas_acl_table::is_action_allowed (BASE_ACL_ACTION_TYPE_t action_id) const noexcept
+{
+    if (_allowed_actions.size() == 0) {
+        // If there is no allowed action given, all actions will be allowed by default
+        return true;
+    }
+    return (_allowed_actions.find(action_id) != _allowed_actions.end());
 }
 
 static inline void _validate_table_npu_change (nas_acl_table& table)
@@ -198,14 +207,57 @@ void nas_acl_table::set_allowed_filter (uint_t filter_id)
 void nas_acl_table::allowed_filters_c_cpy (size_t filter_count,
                                            BASE_ACL_MATCH_TYPE_t* filter_list) const noexcept
 {
-    size_t count = 0;
+    if (_allowed_filters.size() > filter_count) {
+        throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
+                                   "Size of filter list is bigger than given filter count"};
+    }
 
+    size_t count = 0;
     for (auto filter: _allowed_filters) {
         filter_list[count] = filter;
         count++;
     }
-    STD_ASSERT (count <= filter_count);
 }
+
+void nas_acl_table::set_allowed_action (uint_t action_id)
+{
+    if (is_created_in_ndi()) {
+        // Create-Only attribute
+        throw nas::base_exception {NAS_ACL_E_CREATE_ONLY, __PRETTY_FUNCTION__,
+                                "Cannot modify Action-Set for Table"};
+    }
+
+    BASE_ACL_ACTION_TYPE_t act = static_cast <BASE_ACL_ACTION_TYPE_t> (action_id);
+
+    if (!nas_acl_action_t::is_type_valid (act)) {
+        throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
+            std::string {"Unknown Table Action Field type "}
+            + std::to_string (act)};
+    }
+
+    if (!is_attr_dirty (BASE_ACL_TABLE_ALLOWED_ACTIONS)) {
+        mark_attr_dirty (BASE_ACL_TABLE_ALLOWED_ACTIONS);
+        _allowed_actions.clear ();
+    }
+
+    _allowed_actions.insert(act);
+}
+
+void nas_acl_table::allowed_actions_c_cpy (size_t action_count,
+                                           BASE_ACL_ACTION_TYPE_t* action_list) const noexcept
+{
+    if (_allowed_actions.size() > action_count) {
+        throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
+                                   "Size of action list is bigger than given action count"};
+    }
+
+    size_t count = 0;
+    for (auto action: _allowed_actions) {
+        action_list[count] = action;
+        count++;
+    }
+}
+
 
 bool nas_acl_table::is_udf_group_in_list(nas_obj_id_t udf_grp_id) const noexcept
 {
@@ -236,19 +288,33 @@ void nas_acl_table::set_udf_group_id(nas_obj_id_t udf_grp_id)
     }
 }
 
+void nas_acl_table::set_table_name(const char* name)
+{
+    if (is_created_in_ndi()) {
+        // Create-Only attribute
+        throw nas::base_exception {NAS_ACL_E_CREATE_ONLY, __PRETTY_FUNCTION__,
+                                   "Cannot modify name for Table"};
+    }
+    _table_name = name;
+}
+
 void* nas_acl_table::alloc_fill_ndi_obj (nas::mem_alloc_helper_t& mem_trakr)
 {
     ndi_acl_table_t* ndi_tbl_p = mem_trakr.alloc<ndi_acl_table_t> (1);
 
     ndi_tbl_p->filter_count = allowed_filters_count ();
-
     ndi_tbl_p->filter_list = mem_trakr.alloc<BASE_ACL_MATCH_TYPE_t> (ndi_tbl_p->filter_count);
+    allowed_filters_c_cpy (ndi_tbl_p->filter_count, ndi_tbl_p->filter_list);
+
+    ndi_tbl_p->action_count = allowed_actions_count();
+    if (ndi_tbl_p->action_count > 0) {
+        ndi_tbl_p->action_list = mem_trakr.alloc<BASE_ACL_ACTION_TYPE_t> (ndi_tbl_p->action_count);
+        allowed_actions_c_cpy(ndi_tbl_p->action_count, ndi_tbl_p->action_list);
+    }
 
     ndi_tbl_p->stage = stage();
     ndi_tbl_p->priority = priority();
     ndi_tbl_p->size = table_size();
-
-    allowed_filters_c_cpy (ndi_tbl_p->filter_count, ndi_tbl_p->filter_list);
 
     return ndi_tbl_p;
 }
@@ -335,6 +401,7 @@ bool nas_acl_table::is_leaf_attr (nas_attr_id_t attr_id)
     {
         // Only table priority can be modified
         {BASE_ACL_TABLE_ALLOWED_MATCH_FIELDS, false},
+        {BASE_ACL_TABLE_ALLOWED_ACTIONS,      false},
         {BASE_ACL_TABLE_STAGE,                true},
         {BASE_ACL_TABLE_PRIORITY,             true},
         //The NPU ID list attribute is handled by the base object itself.
@@ -365,9 +432,29 @@ bool nas_acl_table::push_leaf_attr_to_npu (nas_attr_id_t attr_id,
                                 get_switch().id(), table_id(), npu_id);
             break;
         default:
-            STD_ASSERT (0);
+            throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
+                                       std::string {"Invalid attribute ID: "} +
+                                       std::to_string(attr_id)};
     }
 
     return true;
 }
 
+nas_obj_id_t nas_acl_table::get_udf_group_from_pos(size_t udf_grp_pos) const
+{
+    return _udf_group_list.at(udf_grp_pos);
+}
+
+size_t nas_acl_table::get_udf_group_pos(nas_obj_id_t udf_grp_id) const
+{
+    size_t idx = 0;
+    for (auto grp_id: _udf_group_list) {
+        if (grp_id == udf_grp_id) {
+            return idx;
+        }
+        idx ++;
+    }
+
+    throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
+        std::string {"Invalid UDF Group ID "} + std::to_string (udf_grp_id)};
+}

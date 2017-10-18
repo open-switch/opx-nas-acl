@@ -99,6 +99,20 @@ nas_acl_fill_table_allowed_fields (cps_api_object_t obj, const nas_acl_table& ta
 }
 
 static inline bool
+nas_acl_fill_table_allowed_actions (cps_api_object_t obj, const nas_acl_table& table) noexcept
+{
+    for (auto attr_id: table.allowed_actions ()) {
+        if (!cps_api_object_attr_add_u32 (obj,
+                                          BASE_ACL_TABLE_ALLOWED_ACTIONS,
+                                          attr_id)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+static inline bool
 nas_acl_fill_table_udf_group_list (cps_api_object_t obj, const nas_acl_table& table) noexcept
 {
     if (obj == nullptr) {
@@ -140,6 +154,10 @@ nas_acl_fill_table_attr_info (cps_api_object_t obj, const nas_acl_table& table,
         return false;
     }
 
+    if (!nas_acl_fill_table_allowed_actions (obj, table)) {
+        return false;
+    }
+
     if (!nas_acl_fill_table_udf_group_list(obj, table)) {
         return false;
     }
@@ -148,6 +166,12 @@ nas_acl_fill_table_attr_info (cps_api_object_t obj, const nas_acl_table& table,
         return false;
     }
 
+    if (table.table_name() != nullptr) {
+        if (!cps_api_object_attr_add(obj, BASE_ACL_TABLE_NAME, table.table_name(),
+                                     strlen(table.table_name()) + 1)) {
+            return false;
+        }
+    }
     return true;
 }
 
@@ -228,12 +252,14 @@ t_std_error nas_acl_get_table (cps_api_get_params_t *param, size_t index,
     bool table_id_key = nas_acl_cps_key_get_obj_id (filter_obj,
                                                     BASE_ACL_TABLE_ID,
                                                     &table_id);
+    cps_api_object_attr_t name_attr = cps_api_get_key_data(filter_obj,
+                                                           BASE_ACL_TABLE_NAME);
     try {
         if (!switch_id_key) {
             /* No keys provided */
             rc = nas_acl_get_table_info_all (param, index);
         }
-        else if (switch_id_key && !table_id_key) {
+        else if (switch_id_key && (!table_id_key && !name_attr)) {
             /* Switch Id provided */
             nas_acl_switch& s = nas_acl_get_switch (switch_id);
             rc = nas_acl_get_table_info_by_switch (param, index, s);
@@ -247,6 +273,21 @@ t_std_error nas_acl_get_table (cps_api_get_params_t *param, size_t index,
             nas_acl_table&  table = s.get_table (table_id);
 
             rc = nas_acl_get_table_info (param, index, table);
+        }
+        else if (switch_id_key && name_attr) {
+            char* table_name = (char*)cps_api_object_attr_data_bin(name_attr);
+            /* Switch Id and Table Name provided */
+            NAS_ACL_LOG_DETAIL ("Switch Id: %d, Table Name: %s\n",
+                                switch_id, table_name);
+
+            nas_acl_switch&     s = nas_acl_get_switch (switch_id);
+            nas_acl_table*  table_p = s.find_table_by_name (table_name);
+            if (table_p == nullptr) {
+                throw nas::base_exception {NAS_ACL_E_KEY_VAL, __FUNCTION__,
+                    "Specified ACL Table not found "};
+            }
+
+            rc = nas_acl_get_table_info (param, index, *table_p);
         }
         else {
             throw nas::base_exception {NAS_ACL_E_MISSING_KEY, __FUNCTION__,
@@ -277,9 +318,11 @@ t_std_error nas_acl_table_create (cps_api_object_t obj,
     uint_t                 priority;
     uint_t                 table_size;
     uint_t                 match_field;
+    uint_t                 action_type;
     bool                   is_stage_present = false;
     bool                   is_priority_present = false;
     bool                   is_size_present = false;
+    bool                   is_name_present = false;
     bool                   id_passed_in = false;
 
     if (!nas_acl_cps_key_get_switch_id (obj, NAS_ACL_SWITCH_ATTR,
@@ -368,11 +411,41 @@ t_std_error nas_acl_table_create (cps_api_object_t obj,
                     tmp_table.set_allowed_filter (match_field);
                     break;
 
+                case BASE_ACL_TABLE_ALLOWED_ACTIONS:
+                    action_type = cps_api_object_attr_data_u32 (it.attr);
+                    NAS_ACL_LOG_DETAIL ("Action type: %d (%s)", action_type,
+                                        nas_acl_action_type_name (static_cast
+                                                                  <BASE_ACL_ACTION_TYPE_t>
+                                                                  (action_type)));
+
+                    tmp_table.set_allowed_action (action_type);
+                    break;
+
                 case BASE_ACL_TABLE_UDF_GROUP_LIST:
                 {
                     nas_obj_id_t udf_grp_id = cps_api_object_attr_data_u64(it.attr);
                     NAS_ACL_LOG_DETAIL ("UDF Group ID: %lu", udf_grp_id);
                     tmp_table.set_udf_group_id(udf_grp_id);
+                    break;
+                }
+
+                case BASE_ACL_TABLE_NAME:
+                {
+                    if (is_name_present == true) {
+                        throw nas::base_exception {NAS_ACL_E_DUPLICATE,
+                            __FUNCTION__, "Duplicate Name attribute "};
+                    }
+                    else {
+                        is_name_present = true;
+                        char* name = (char*)cps_api_object_attr_data_bin (it.attr);
+                        nas_acl_table* tbl_p = s.find_table_by_name(name);
+                        if (tbl_p != nullptr) {
+                            throw nas::base_exception {NAS_ACL_E_DUPLICATE,
+                                __FUNCTION__, "Table Name was already used by exsiting object"};
+                        }
+                        tmp_table.set_table_name (name);
+                        NAS_ACL_LOG_DETAIL ("Name: %s", name);
+                    }
                     break;
                 }
 
@@ -451,26 +524,40 @@ t_std_error nas_acl_table_delete (cps_api_object_t obj,
         NAS_ACL_LOG_ERR ("Switch ID is a mandatory key for Table Delete");
         return NAS_ACL_E_MISSING_KEY;
     }
-    if (!nas_acl_cps_key_get_obj_id (obj, BASE_ACL_TABLE_ID, &table_id)) {
-        NAS_ACL_LOG_ERR ("Table ID is a mandatory key for Table Delete");
-        return NAS_ACL_E_MISSING_KEY;
-    }
-
-    NAS_ACL_LOG_BRIEF ("%sSwitch Id: %d Table Id %ld",
-                       (is_rollbk_op) ? "** ROLLBACK **: " : "", switch_id, table_id);
 
     try {
         nas_acl_switch& s = nas_acl_get_switch (switch_id);
 
-        nas_acl_table& curr_table = s.get_table (table_id);
+        nas_acl_table* table_p = nullptr;
+        if (nas_acl_cps_key_get_obj_id (obj, BASE_ACL_TABLE_ID, &table_id)) {
+            NAS_ACL_LOG_BRIEF ("%sSwitch Id: %d Table Id %ld",
+                           (is_rollbk_op) ? "** ROLLBACK **: " : "", switch_id, table_id);
+            table_p = &s.get_table(table_id);
+        } else {
+            cps_api_object_attr_t name_attr = cps_api_get_key_data(obj,
+                                                                   BASE_ACL_TABLE_NAME);
+            if (name_attr == nullptr) {
+                NAS_ACL_LOG_ERR ("Table ID or Name is mandatory key for Table Delete");
+                return NAS_ACL_E_MISSING_KEY;
+            }
+            char* table_name = (char*)cps_api_object_attr_data_bin(name_attr);
+            NAS_ACL_LOG_BRIEF ("%sSwitch Id: %d Table Name %s",
+                           (is_rollbk_op) ? "** ROLLBACK **: " : "", switch_id, table_name);
+            table_p = s.find_table_by_name(table_name);
+            if (table_p == nullptr) {
+                NAS_ACL_LOG_ERR ("Could not find ACL Table");
+                return NAS_ACL_E_MISSING_KEY;
+            }
+            table_id = table_p->table_id();
+        }
 
         if (!is_rollbk_op) {
             cps_api_object_set_key (prev, cps_api_object_key (obj));
-            _cps_key_fill (prev, curr_table);
-            nas_acl_fill_table_attr_info (prev, curr_table);
+            _cps_key_fill (prev, *table_p);
+            nas_acl_fill_table_attr_info (prev, *table_p);
         }
 
-        curr_table.commit_delete (is_rollbk_op);
+        table_p->commit_delete (is_rollbk_op);
 
         // WARNING !!! CANNOT throw error or exception beyond this point
         // since table is already deleted from SAI
