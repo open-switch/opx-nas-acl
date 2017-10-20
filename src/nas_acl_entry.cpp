@@ -36,7 +36,8 @@ static void _utl_push_disable_action_to_npu (nas_acl_entry& acl_entry,
                                              bool remove_counter=false);
 
 nas_acl_entry::nas_acl_entry (const nas_acl_table* table_p)
-    :nas::base_obj_t (&(table_p->get_switch())), _table_p (table_p)
+    :nas::base_obj_t (&(table_p->get_switch())), _entry_name(""),
+     _table_p (table_p)
 {
 }
 
@@ -45,6 +46,10 @@ nas_obj_id_t  nas_acl_entry::table_id() const noexcept
     return _table_p->table_id();
 }
 
+const char*  nas_acl_entry::table_name() const noexcept
+{
+    return _table_p->table_name();
+}
 // Override base npu_list routine to return a more restrictive
 // NPU list in case the ACL entry is qualified with in ports or out ports
 const nas::npu_set_t&  nas_acl_entry::npu_list () const
@@ -61,6 +66,10 @@ void nas_acl_entry::set_priority (ndi_acl_priority_t p)
     mark_attr_dirty (BASE_ACL_ENTRY_PRIORITY);
 }
 
+void nas_acl_entry::set_entry_name (const char* name)
+{
+    _entry_name = name;
+}
 void nas_acl_entry::copy_table_npus ()
 {
     // Reset to the table NPU list
@@ -173,12 +182,39 @@ nas_acl_counter_t* nas_acl_entry::get_counter ()
         &sw.get_counter (table_id(), counter_id()): NULL;
 }
 
+bool nas_acl_entry::get_range_list(std::vector<nas_acl_range*>& range_list) const
+{
+    auto& sw = get_table().get_switch();
+
+    if (!is_range_enabled ()) {
+        return false;
+    }
+
+    auto id_list_p = range_id_list();
+    if (id_list_p == nullptr) {
+        return false;
+    }
+
+    for (auto range_id: *id_list_p) {
+        nas_acl_range* range_p = sw.find_acl_range(range_id);
+        if (range_p != nullptr) {
+            range_list.push_back(range_p);
+        }
+    }
+
+    return true;
+}
 /*
  * reset=True indicates that this Entry is being created or modified in overwrite mode
  * reset=False indicates that a single Action is being added/modified/deleted
  */
 void nas_acl_entry::add_action (nas_acl_action_t& action, bool reset)
 {
+    if (!get_table().is_action_allowed (action.action_type())) {
+        throw nas::base_exception {NAS_ACL_E_INCONSISTENT, __PRETTY_FUNCTION__,
+                              std::string {"Table does not allow action "}
+                              + std::string (action.name())};
+    }
     if (reset && !is_attr_dirty (BASE_ACL_ENTRY_ACTION)) {
         _alist.clear ();
     }
@@ -294,6 +330,47 @@ const nas_acl_action_t& nas_acl_entry::get_action (BASE_ACL_ACTION_TYPE_t
     }
 }
 
+static void _copy_ndi_range_id_list (const nas_acl_entry& entry,
+                                     ndi_acl_entry_filter_t& ndi_filter,
+                                     npu_id_t  npu_id,
+                                     nas::mem_alloc_helper_t& mem_trakr) noexcept
+{
+    std::vector<nas_acl_range*> range_list;
+    if (!entry.get_range_list(range_list)) {
+        return;
+    }
+    std::vector<ndi_obj_id_t> ndi_id_list;
+    for (auto range_p: range_list) {
+        try {
+            ndi_id_list.push_back(range_p->get_ndi_obj_id(npu_id));
+        } catch(...) {
+            continue;
+        }
+    }
+    ndi_filter.data.values.ndi_obj_ref_list.count = ndi_id_list.size();
+    ndi_filter.data.values.ndi_obj_ref_list.list =
+            mem_trakr.alloc<ndi_obj_id_t>(ndi_id_list.size());
+    uint_t count = 0;
+    for (auto ndi_id: ndi_id_list) {
+        ndi_filter.data.values.ndi_obj_ref_list.list[count++] = ndi_id;
+    }
+}
+
+/* Increment or decrement ref count of all range objects assocated with ACL entry */
+static void _update_range_ref_cnt(const nas_acl_entry& entry, bool inc)
+{
+    std::vector<nas_acl_range*> range_list;
+    if (!entry.get_range_list(range_list)) {
+        return;
+    }
+    for (auto range_p: range_list) {
+        if (inc) {
+            range_p->inc_acl_ref_count();
+        } else {
+            range_p->dec_acl_ref_count();
+        }
+    }
+}
 
 bool nas_acl_entry::_copy_all_filters_ndi (ndi_acl_entry_t &ndi_acl_entry,
                                            npu_id_t npu_id,
@@ -308,6 +385,11 @@ bool nas_acl_entry::_copy_all_filters_ndi (ndi_acl_entry_t &ndi_acl_entry,
                                 npu_id, mem_trakr)) {
             // NPU specific filter is not needed for
             return false;
+        }
+        if (f.is_range()) {
+            _copy_ndi_range_id_list(*this, ndi_acl_entry.filter_list[i], npu_id,
+                                    mem_trakr);
+            _update_range_ref_cnt(*this, true);
         }
     }
     return true;
@@ -415,6 +497,9 @@ bool nas_acl_entry::push_delete_obj_to_npu (npu_id_t npu_id)
                                    " Delete failed for NPU " + std::to_string (npu_id)};
     }
 
+    if (is_range_enabled()) {
+        _update_range_ref_cnt(*this, false);
+    }
     NAS_ACL_LOG_DETAIL ("Switch %d Table %ld: Deleted ACL Entry %ld in NPU %d "
                         "NDI-ID 0x%" PRIx64,
                         switch_id(), table_id(), entry_id(), npu_id,
@@ -427,10 +512,9 @@ bool nas_acl_entry::push_delete_obj_to_npu (npu_id_t npu_id)
 
 bool nas_acl_entry::is_leaf_attr (nas_attr_id_t attr_id)
 {
-    static const std::unordered_map <BASE_ACL_ENTRY_t,
+    static const auto& _leaf_attr_map = *new std::unordered_map <BASE_ACL_ENTRY_t,
                                      bool,
                                      std::hash<int>>
-        _leaf_attr_map =
     {
         {BASE_ACL_ENTRY_PRIORITY,        true},
         {BASE_ACL_ENTRY_MATCH,           false},
@@ -521,6 +605,9 @@ static void _utl_push_disable_filter_to_npu (nas_acl_entry& acl_entry,
                                    " for NPU " + std::to_string (npu_id)};
     }
 
+    if (f_type == BASE_ACL_MATCH_TYPE_RANGE_CHECK) {
+        _update_range_ref_cnt(acl_entry, false);
+    }
     NAS_ACL_LOG_DETAIL ("ACL Entry NDI: Disabled Filter %s in NPU %d",
                         nas_acl_filter_t::type_name (f_type), npu_id);
 }
@@ -538,6 +625,10 @@ static void _utl_push_filter_to_npu (nas_acl_entry& acl_entry,
         return;
     }
 
+    if (f_add.is_range()) {
+        _copy_ndi_range_id_list(acl_entry, ndi_filter, npu_id, mem_trakr);
+        _update_range_ref_cnt(acl_entry, true);
+    }
     t_std_error rc;
 
     if ((rc = ndi_acl_entry_set_filter (npu_id, acl_entry.ndi_entry_ids.at (npu_id),
@@ -597,6 +688,10 @@ static void _utl_modify_flist_npulist_ndi (nas_acl_entry&   entry_new,
              itr_add != add_or_mod_flist.end(); ++itr_add) {
 
             const nas_acl_filter_t& f_add = nas_acl_entry::get_filter_from_itr (itr_add);
+            if (f_add.is_range() && entry_old.is_range_enabled()) {
+                /* Firstly decrement ref count of ranges associated with old entry */
+                _update_range_ref_cnt(entry_old, false);
+            }
 
             try {
                 _utl_push_filter_to_npu (entry_new, f_add, npu_id);

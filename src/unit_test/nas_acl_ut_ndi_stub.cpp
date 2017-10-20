@@ -327,3 +327,14 @@ t_std_error ndi_udf_set_hash_mask(npu_id_t npu_id, ndi_obj_id_t udf_id,
 {
     return STD_ERR_OK;
 }
+
+t_std_error ndi_acl_range_create(npu_id_t npu_id, const ndi_acl_range_t *acl_range_p,
+                                 ndi_obj_id_t *ndi_range_id_p)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_acl_range_delete(npu_id_t npu_id, ndi_obj_id_t ndi_range_id)
+{
+    return STD_ERR_OK;
+}

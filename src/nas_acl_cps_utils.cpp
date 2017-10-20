@@ -287,6 +287,35 @@ _copy_iflist_data_to_obj (cps_api_object_t            obj,
     return true;
 }
 
+static bool
+_copy_objlist_data_to_obj (cps_api_object_t            obj,
+                           nas::attr_list_t&           parent_list,
+                           nas_acl_common_data_list_t& common_data_list)
+{
+    static const int  common_data_list_size = 1;
+    const void *attr_data;
+    size_t attr_len;
+
+    if (common_data_list.size () != common_data_list_size) {
+        return false;
+    }
+
+    for (auto obj_id: common_data_list.at(0).obj_id_list) {
+
+        attr_data = &obj_id;
+        attr_len = sizeof(uint64_t);
+
+        if (!cps_api_object_e_add (obj,
+                                   parent_list.data (),
+                                   parent_list.size (),
+                                   cps_api_object_ATTR_T_U64,
+                                   attr_data, attr_len)) {
+            return false;
+        }
+    }
+
+    return true;
+}
 static nas_acl_common_data_t _cps_wr_attr_data  (cps_api_object_attr_t  attr_val,
                                                  NAS_ACL_DATA_TYPE_t    obj_data_type,
                                                  size_t                 attr_len,
@@ -692,6 +721,49 @@ static nas_acl_common_data_list_t _copy_iflist_data_from_obj (cps_api_object_t  
     return nas_acl_common_data_list_t (1, std::move (common_data));
 }
 
+static nas_acl_common_data_list_t _copy_objlist_data_from_obj (cps_api_object_t   obj,
+                                                               nas::attr_list_t&  parent_list,
+                                                               const std::string& sub_obj_name)
+{
+    auto ifval_attr_id = parent_list.back();
+    parent_list.pop_back ();
+
+    cps_api_object_it_t   it_if_list;
+    if (parent_list.empty()) {
+        // Incremental update -
+        // Get the object iterator using the parent_list with the final attribute removed
+        cps_api_object_it_begin (obj, &it_if_list);
+
+    } else {
+        // Full ACL Entry update -
+        // Get the iterator to the match list entry (at <list-id> level)
+        // using the parent_list with the final attribute removed
+        if (!cps_api_object_it (obj, parent_list.data(), parent_list.size(),
+                                &it_if_list)) {
+            throw nas::base_exception { NAS_ACL_E_MISSING_ATTR, __PRETTY_FUNCTION__,
+                std::string {"Failed to extract "} + sub_obj_name
+                + ": Missing Objlist Attribute " + std::to_string (ifval_attr_id) };
+        }
+
+        // Then move inside to reach the level of the IF-VAL attributes
+        cps_api_object_it_inside (&it_if_list);
+    }
+
+    // Scan for the IF-VAL attribute
+    nas_acl_common_data_t common_data {};
+    for (; cps_api_object_it_valid (&it_if_list); cps_api_object_it_next (&it_if_list)) {
+
+        if (cps_api_object_attr_id (it_if_list.attr) == ifval_attr_id) {
+            nas_obj_id_t obj_id = cps_api_object_attr_data_u64 (it_if_list.attr);
+            common_data.obj_id_list.push_back (obj_id);
+            NAS_ACL_LOG_DETAIL ("match obj id: %ld", obj_id);
+        }
+    }
+
+    return nas_acl_common_data_list_t (1, std::move (common_data));
+}
+
+// Copy attribute from common data structure to cps object
 bool
 nas_acl_copy_data_to_obj (cps_api_object_t               obj,
                           nas::attr_list_t&              parent_list,
@@ -729,6 +801,9 @@ nas_acl_copy_data_to_obj (cps_api_object_t               obj,
             rc = _copy_iflist_data_to_obj (obj, parent_list, common_data_list, true);
             break;
 
+        case NAS_ACL_DATA_OBJ_ID_LIST:
+            rc = _copy_objlist_data_to_obj (obj, parent_list, common_data_list);
+            break;
         default:
             rc = false;
             break;
@@ -737,6 +812,7 @@ nas_acl_copy_data_to_obj (cps_api_object_t               obj,
     return rc;
 }
 
+// Copy attribute from cps object to list of common data structure
 nas_acl_common_data_list_t
 nas_acl_copy_data_from_obj (cps_api_object_t                obj,
                             nas::attr_list_t&               parent_list,
@@ -750,6 +826,8 @@ nas_acl_copy_data_from_obj (cps_api_object_t                obj,
             return _copy_iflist_data_from_obj(obj, parent_list, sub_obj_name, false);
         case NAS_ACL_DATA_IFNAME_LIST:
             return _copy_iflist_data_from_obj(obj, parent_list, sub_obj_name, true);
+        case NAS_ACL_DATA_OBJ_ID_LIST:
+            return _copy_objlist_data_from_obj(obj, parent_list, sub_obj_name);
         default:
             break;
     }
@@ -759,9 +837,9 @@ nas_acl_copy_data_from_obj (cps_api_object_t                obj,
 
 const char* nas_acl_obj_data_type_to_str (NAS_ACL_DATA_TYPE_t obj_data_type)
 {
-    static const std::unordered_map
+    static const auto& _obj_data_type_to_str_map = *new std::unordered_map
         <NAS_ACL_DATA_TYPE_t, const char*, std::hash<int>>
-        _obj_data_type_to_str_map = {
+         {
             {NAS_ACL_DATA_NONE,     "NONE"},
             {NAS_ACL_DATA_U8,       "U8"},
             {NAS_ACL_DATA_U16,      "U16"},
@@ -775,6 +853,7 @@ const char* nas_acl_obj_data_type_to_str (NAS_ACL_DATA_TYPE_t obj_data_type)
             {NAS_ACL_DATA_OPAQUE,   "OPAQUE"},
             {NAS_ACL_DATA_IFINDEX,  "IFINDEX"},
             {NAS_ACL_DATA_IFNAME,   "IFNAME"},
+            {NAS_ACL_DATA_OBJ_ID_LIST,  "OBJ-ID-LIST"},
         };
 
     const auto& map_kv = _obj_data_type_to_str_map.find (obj_data_type);
