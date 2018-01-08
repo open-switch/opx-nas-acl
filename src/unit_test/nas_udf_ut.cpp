@@ -742,6 +742,7 @@ static bool nas_udf_ut_get_object(nas_obj_id_t nas_id,
         }
     }
 
+    cps_api_get_request_close(&gp);
     return true;
 }
 

@@ -255,6 +255,17 @@ t_std_error ndi_acl_counter_get_byte_count (npu_id_t npu_id,
     *byte_count_p = count;
     return STD_ERR_OK;
 }
+t_std_error ndi_acl_counter_get_count (npu_id_t npu_id,
+                                            ndi_obj_id_t ndi_counter_id,
+                                            uint64_t* byte_count_p,
+                                            uint64_t* pkt_count_p)
+{
+    static uint64_t count = 0;
+    ut_printf ("%s: npu %d, id %ld\n", __FUNCTION__, npu_id, ndi_counter_id);
+    count += 2000;
+    *byte_count_p = count;
+    return STD_ERR_OK;
+}
 
 t_std_error ndi_acl_counter_set_pkt_count (npu_id_t npu_id,
                                            ndi_obj_id_t ndi_counter_id,

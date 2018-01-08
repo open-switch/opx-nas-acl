@@ -117,7 +117,7 @@ def apply_table_cfg(etree_table, stage, prio):
     table_name = etree_table.attrib['tag']
 
     dbg_print("Creating table stage = ", stage, "prio = ", prio)
-    t = nas_acl.TableCPSObj(stage=stage, priority=int(prio))
+    t = nas_acl.TableCPSObj(table_id=table_name, stage=stage, priority=int(prio))
     for field in etree_table.findall('allow-match'):
         dbg_print("Add allow filter ", field.text)
         t.add_allow_filter(field.text)
@@ -159,7 +159,7 @@ def apply_entry_cfg(
     dbg_print("Creating entry ", entry_name, " in table_name = ", table_name)
     dbg_print(" ... table_id = ", table_id, "prio = ", prio)
 
-    e = nas_acl.EntryCPSObj(table_id=table_id, priority=int(prio))
+    e = nas_acl.EntryCPSObj(table_id=table_id, entry_id=entry_name, priority=int(prio))
 
     for match in etree_entry.findall('match'):
         elem_type, elem_val = get_entry_elem(match)

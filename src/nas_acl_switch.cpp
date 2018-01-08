@@ -123,6 +123,88 @@ nas_acl_entry* nas_acl_switch::find_entry_by_name (nas_obj_id_t tbl_id,
     return nullptr;
 }
 
+void nas_acl_switch::delete_pbr_action_by_nh_obj (ndi_obj_id_t nh_obj_id) noexcept
+{
+    std::vector<nas_acl_entry *> entry_list;
+
+    for (auto & pbr_entry_id: _cached_pbr_entries) {
+        try {
+            nas_acl_entry *acl_entry = find_entry(pbr_entry_id.tbl_id, pbr_entry_id.entry_id);
+
+            if (acl_entry == nullptr) {
+                continue;
+            }
+
+            nas_acl_action_t acl_entry_action =
+                acl_entry->get_action(BASE_ACL_ACTION_TYPE_REDIRECT_IP_NEXTHOP);
+
+            if (acl_entry_action.match_opaque_data_by_nexthop_id(nh_obj_id)) {
+                // find a matching nh obj reference; collect the entry for deletion
+                entry_list.push_back(acl_entry);
+            }
+
+        } catch (...) {
+        }
+    }
+
+    for (auto entry: entry_list) {
+        nas_acl_entry new_entry(*entry);
+
+        new_entry.remove_action(BASE_ACL_ACTION_TYPE_REDIRECT_IP_NEXTHOP);
+
+        new_entry.commit_modify(*entry, false);
+
+        entry->get_table().get_switch().save_entry(std::move(new_entry));
+
+    }
+
+    return;
+}
+
+void nas_acl_switch::add_pbr_entry_to_cache(nas_obj_id_t tbl_id, nas_obj_id_t entry_id)
+{
+    bool found = false;
+
+    for( auto iter = _cached_pbr_entries.begin();
+            iter != _cached_pbr_entries.end();
+            ++iter )
+    {
+        if( iter->tbl_id == tbl_id &&
+            iter->entry_id == entry_id)
+        {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        pbr_entry_id_t pbr_entry;
+        pbr_entry.tbl_id = tbl_id;
+        pbr_entry.entry_id = entry_id;
+        _cached_pbr_entries.push_back(pbr_entry);
+        NAS_ACL_LOG_BRIEF("Adding PBR entry tbl_id %d, entry_id %d to cache",
+                   tbl_id, entry_id);
+
+    }
+}
+
+void nas_acl_switch::del_pbr_entry_from_cache(nas_obj_id_t tbl_id, nas_obj_id_t entry_id)
+{
+    for( auto iter = _cached_pbr_entries.begin();
+            iter != _cached_pbr_entries.end();
+            ++iter )
+    {
+        if( iter->tbl_id == tbl_id &&
+            iter->entry_id == entry_id)
+        {
+            NAS_ACL_LOG_BRIEF("Deleting PBR entry tbl_id %d, entry_id %d from cache",
+                       tbl_id, entry_id);
+            _cached_pbr_entries.erase( iter );
+            break;
+        }
+    }
+}
+
 nas_acl_counter_t& nas_acl_switch::get_counter (nas_obj_id_t tbl_id,
                                                 nas_obj_id_t counter_id)
 {

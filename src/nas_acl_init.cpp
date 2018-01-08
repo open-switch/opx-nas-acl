@@ -21,21 +21,22 @@
  */
 #include "cps_api_events.h"
 #include "cps_api_operation.h"
+#include "cps_class_map.h"
 #include "nas_acl_log.h"
 #include "std_error_codes.h"
 #include "nas_acl_cps.h"
 #include "nas_udf_cps.h"
-#include "nas_acl_init.h"
 #include "std_mutex_lock.h"
 
 /*** NAS ACL Main Control block ***/
-std_mutex_lock_create_static_init_fast (nas_acl_mutex);
+static std_mutex_lock_create_static_init_fast (nas_acl_mutex);
 
 static t_std_error _cps_init ()
 {
     cps_api_operation_handle_t       handle;
     cps_api_return_code_t            rc;
     cps_api_registration_functions_t f;
+    char buff[CPS_API_KEY_STR_MAX];
 
     rc = cps_api_operation_subsystem_init (&handle,1);
 
@@ -92,6 +93,28 @@ static t_std_error _cps_init ()
         return STD_ERR(ACL, FAIL, rc);
     }
 
+    memset (&f, 0, sizeof(f));
+    /*
+     * Register to delete entries Action for for next-hop group
+     */
+    if (!cps_api_key_from_attr_with_qual(&f.key,BASE_ACL_CLEAR_ACL_ENTRIES_FOR_NH_OBJ,
+                                         cps_api_qualifier_TARGET)) {
+        NAS_ACL_LOG_ERR ("Could not translate %d to key %s",
+                        (int)(BASE_ACL_CLEAR_ACL_ENTRIES_FOR_NH_OBJ),
+                        cps_api_key_print(&f.key,buff,sizeof(buff)-1));
+
+        return STD_ERR(ACL,FAIL,0);
+    }
+
+    f.handle = handle;
+    f._write_function = nas_acl_delete_nh_acl_entry_action;
+
+    rc = cps_api_register(&f);
+    if (rc != cps_api_ret_code_OK) {
+        NAS_ACL_LOG_ERR ("NAS ACL CLEAR NH CPS object Register failed");
+        return STD_ERR(ACL,FAIL,rc);
+    }
+
 
     return STD_ERR_OK;
 }
@@ -123,4 +146,6 @@ t_std_error nas_acl_init(void)
 
     return rc;
 }
+
+
 }

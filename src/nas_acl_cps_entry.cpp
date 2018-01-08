@@ -547,6 +547,7 @@ static void  _cps_entry_incr_upd (cps_api_object_t       obj,
     nas_acl_entry     new_entry (old_entry);
     const nas_acl_filter_t* filter_p = NULL;
     const nas_acl_action_t* action_p = NULL;
+    bool rollbk_info_exist = true;
 
     NAS_ACL_LOG_BRIEF ("%sOp %d, Switch Id: %d, Table Id: %ld, Entry Id %ld",
                        (is_rollbk_op) ? "** ROLLBACK **: " : "",
@@ -580,7 +581,15 @@ static void  _cps_entry_incr_upd (cps_api_object_t       obj,
                             nas_acl_action_t::type_name (atype));
 
         if (op != cps_api_oper_CREATE) {
-            action_p = &(old_entry.get_action (atype));
+            // ACTION could be deleted already by the RPC call from NAS-L3
+            // before application tries to modify the ACTION.
+            try {
+                action_p = &(old_entry.get_action (atype));
+            }
+            catch (...) {
+                // if old ACTION does not exist, cannot rollback
+                rollbk_info_exist = false;
+            }
         }
         if (op == cps_api_oper_DELETE) {
             new_entry.remove_action(atype);
@@ -598,7 +607,7 @@ static void  _cps_entry_incr_upd (cps_api_object_t       obj,
     // WARNING !!! CANNOT throw error or exception beyond this point
     // since entry is already committed to SAI
 
-    if (!is_rollbk_op) {
+    if (!is_rollbk_op && rollbk_info_exist) {
         nas::attr_list_t attr_id_list;
         attr_id_list.reserve (NAS_ACL_MAX_ATTR_DEPTH);
 
@@ -766,7 +775,6 @@ static t_std_error nas_acl_entry_create (cps_api_object_t obj,
         }
 
         nas_acl_entry tmp_entry (&op_key.t);
-        _cps_parse_entry_obj (obj, tmp_entry, cps_api_oper_CREATE);
 
         // Allocate a new ID for the entry beforehand
         // to avoid rolling back commit if ID allocation fails
@@ -777,6 +785,8 @@ static t_std_error nas_acl_entry_create (cps_api_object_t obj,
             entry_id  = idg.alloc_guarded_id ();
         }
         tmp_entry.set_entry_id (entry_id);
+
+        _cps_parse_entry_obj (obj, tmp_entry, cps_api_oper_CREATE);
 
         // Apply new entry to NDI and SAI
         tmp_entry.commit_create (is_rollbk_op);

@@ -151,6 +151,10 @@ void nas_acl_entry::remove_action (BASE_ACL_ACTION_TYPE_t atype)
 {
     _alist.erase (atype);
     mark_attr_dirty (BASE_ACL_ENTRY_ACTION);
+
+    if (atype == BASE_ACL_ACTION_TYPE_REDIRECT_IP_NEXTHOP) {
+        get_table().get_switch().del_pbr_entry_from_cache(table_id(), entry_id());
+    }
 }
 
 void nas_acl_entry::reset_filter ()
@@ -240,6 +244,11 @@ void nas_acl_entry::add_action (nas_acl_action_t& action, bool reset)
                                        std::to_string (this->table_id())};
         }
     }
+
+    if (action.action_type() == BASE_ACL_ACTION_TYPE_REDIRECT_IP_NEXTHOP) {
+        get_table().get_switch().add_pbr_entry_to_cache(table_id(), entry_id());
+    }
+
 }
 
 void nas_acl_entry::commit_create (bool rolling_back)

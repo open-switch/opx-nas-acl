@@ -44,10 +44,13 @@ void nas_acl_utl_ifidx_to_ndi_port (hal_ifindex_t ifindex, interface_ctrl_t *int
                                        std::to_string (ifindex)};
     }
     if (intf_ctrl_p->int_type != nas_int_type_PORT &&
+        intf_ctrl_p->int_type != nas_int_type_CPU &&
         intf_ctrl_p->int_type != nas_int_type_FC) {
         throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
-                                   std::string {"Invalid IfIndex type"} +
-                                       std::to_string (ifindex)};
+                                   std::string {"Invalid interface type "} +
+                                   std::to_string(intf_ctrl_p->int_type) +
+                                   std::string {" for ifindex "} +
+                                   std::to_string(ifindex)};
     }
 }
 

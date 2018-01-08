@@ -53,6 +53,7 @@ nas_acl_filter_t::nas_acl_filter_t (const nas_acl_table* table, BASE_ACL_MATCH_T
     }
     if (t == BASE_ACL_MATCH_TYPE_FDB_DST_HIT ||
         t == BASE_ACL_MATCH_TYPE_NEIGHBOR_DST_HIT ||
+        t == BASE_ACL_MATCH_TYPE_DROP_MARKED ||
         t == BASE_ACL_MATCH_TYPE_ROUTE_DST_HIT) {
         _f_info.values_type = NDI_ACL_FILTER_BOOL;
     }
@@ -330,10 +331,13 @@ void nas_acl_filter_t::set_filter_ifindex (const nas_acl_common_data_list_t& val
 
     if (nas_acl_utl_is_ifidx_type_lag(ifindex)) {
         nas::ndi_obj_id_table_t tmp_ndi_oid_tbl;
-        if (dn_nas_lag_get_ndi_ids (ifindex, &tmp_ndi_oid_tbl) != STD_ERR_OK) {
+        lag_id_t lag_id;
+        if (nas_get_lag_id_from_if_index(ifindex, &lag_id) != STD_ERR_OK) {
            throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
-                                      "Failed to get LAG NDI IDs"};
+                                      "Failed to get LAG NDI ID"};
         }
+        //@TODO to retrive NPU ID in multi npu case
+        tmp_ndi_oid_tbl.insert({0, static_cast<ndi_obj_id_t>(lag_id)});
         auto oid = static_cast <nas_obj_id_t> (ifindex);
         _nas2ndi_oid_tbl[oid] = std::move (tmp_ndi_oid_tbl);
         _f_info.values_type = NDI_ACL_FILTER_OBJ_ID;
@@ -491,10 +495,12 @@ nas::npu_set_t nas_acl_filter_t::get_npu_list () const
 
     if (is_npu_specific()) {
         for (auto ifindex: _ifindex_list) {
-            // Convert to NPU and port
-            interface_ctrl_t  intf_ctrl {};
-            nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
-            filter_npu_list.add (intf_ctrl.npu_id);
+            if (!nas_acl_utl_is_ifidx_type_lag (ifindex)) {
+                // Convert to NPU and port
+                interface_ctrl_t  intf_ctrl {};
+                nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
+                filter_npu_list.add (intf_ctrl.npu_id);
+            }
         }
     }
 

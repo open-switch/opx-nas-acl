@@ -400,3 +400,69 @@ nas_udf_cps_api_rollback (void                         *context,
     auto rc = nas_udf_cps_api_write_internal (context, param, obj, op, true);
     return static_cast<cps_api_return_code_t>(rc);
 }
+
+/**
+ * Delete PBR ACL entry action with a matching Next Hop object
+ * @Param  Next Hop object id
+ * @Return Standard Error Code
+ */
+t_std_error nas_acl_delete_pbr_action_by_nh_obj(nas_switch_id_t switch_id, nas_obj_id_t nh_obj)
+{
+    nas_acl_lock();
+
+    nas_acl_switch& s = nas_acl_get_switch(switch_id);
+
+    s.delete_pbr_action_by_nh_obj(nh_obj);
+
+    nas_acl_unlock();
+
+    return STD_ERR_OK;
+}
+
+
+cps_api_return_code_t
+nas_acl_delete_nh_acl_entry_action (void               *context,
+                        cps_api_transaction_params_t *param,
+                       size_t ix) noexcept
+{
+
+    NAS_ACL_LOG_BRIEF("Delete next hop ACL entries Action");
+
+    if(param == NULL){
+        NAS_ACL_LOG_ERR("Delete NH ACL entries action with no param");
+        return cps_api_ret_code_ERR;
+    }
+
+    cps_api_object_t obj = cps_api_object_list_get(param->change_list,ix);
+    if (obj == NULL) {
+        NAS_ACL_LOG_ERR("Delete NH ACL entries action operation: object is not present");
+        return cps_api_ret_code_ERR;
+    }
+
+    cps_api_operation_types_t op = cps_api_object_type_operation(cps_api_object_key(obj));
+
+    if (op != cps_api_oper_ACTION) {
+        NAS_ACL_LOG_ERR("Invalid  mode change operation action");
+        return cps_api_ret_code_ERR;
+    }
+
+    nas::ndi_obj_id_table_t nh_id_table;
+    cps_api_attr_id_t  attr_id_list[] = {BASE_ACL_CLEAR_ACL_ENTRIES_FOR_NH_INPUT_DATA};
+    if(!nas::ndi_obj_id_table_cps_unserialize (nh_id_table, obj, attr_id_list,
+                            sizeof(attr_id_list)/sizeof(attr_id_list[0]))) {
+        NAS_ACL_LOG_ERR("Failed to unserialize nh opaque data \n");
+        return cps_api_ret_code_ERR;
+    }
+    auto it = nh_id_table.begin();
+    if (it == nh_id_table.end()){
+        NAS_ACL_LOG_ERR("No NH opaque data passed");
+        return cps_api_ret_code_ERR;
+    }
+    NAS_ACL_LOG_BRIEF(" Found NH opaque data %lld ", it->second);
+
+    nas_acl_delete_pbr_action_by_nh_obj(0, it->second);
+
+    NAS_ACL_LOG_BRIEF("Delete next hop ACL entry action EXITS");
+
+    return cps_api_ret_code_OK;
+}

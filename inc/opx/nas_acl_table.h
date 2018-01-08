@@ -67,13 +67,13 @@ class nas_acl_table final : public nas::base_obj_t
         size_t      allowed_filters_count () const noexcept;
         const filter_set_t& allowed_filters () const noexcept {return _allowed_filters;}
                    // Copy filter-set to c style array
-        void       allowed_filters_c_cpy (size_t filter_count,
+        bool       allowed_filters_c_cpy (size_t filter_count,
                                           BASE_ACL_MATCH_TYPE_t* filter_list) const noexcept;
         bool        is_action_allowed (BASE_ACL_ACTION_TYPE_t action_id) const noexcept;
         size_t      allowed_actions_count () const noexcept;
         const action_set_t& allowed_actions () const noexcept {return _allowed_actions;}
                    // Copy action-set to c style array
-        void       allowed_actions_c_cpy (size_t action_count,
+        bool       allowed_actions_c_cpy (size_t action_count,
                                           BASE_ACL_ACTION_TYPE_t* action_list) const noexcept;
         bool         is_udf_group_in_list(nas_obj_id_t udf_grp_id) const noexcept;
         size_t       udf_group_list_count() const noexcept {return _udf_group_list.size();}

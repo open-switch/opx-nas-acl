@@ -204,12 +204,12 @@ void nas_acl_table::set_allowed_filter (uint_t filter_id)
     _allowed_filters.insert(f);
 }
 
-void nas_acl_table::allowed_filters_c_cpy (size_t filter_count,
+bool nas_acl_table::allowed_filters_c_cpy (size_t filter_count,
                                            BASE_ACL_MATCH_TYPE_t* filter_list) const noexcept
 {
     if (_allowed_filters.size() > filter_count) {
-        throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
-                                   "Size of filter list is bigger than given filter count"};
+        NAS_ACL_LOG_ERR("Size of filter list is bigger than given filter count");
+        return false;
     }
 
     size_t count = 0;
@@ -217,6 +217,8 @@ void nas_acl_table::allowed_filters_c_cpy (size_t filter_count,
         filter_list[count] = filter;
         count++;
     }
+
+    return true;
 }
 
 void nas_acl_table::set_allowed_action (uint_t action_id)
@@ -243,12 +245,12 @@ void nas_acl_table::set_allowed_action (uint_t action_id)
     _allowed_actions.insert(act);
 }
 
-void nas_acl_table::allowed_actions_c_cpy (size_t action_count,
+bool nas_acl_table::allowed_actions_c_cpy (size_t action_count,
                                            BASE_ACL_ACTION_TYPE_t* action_list) const noexcept
 {
     if (_allowed_actions.size() > action_count) {
-        throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
-                                   "Size of action list is bigger than given action count"};
+        NAS_ACL_LOG_ERR("Size of action list is bigger than given action count");
+        return false;
     }
 
     size_t count = 0;
@@ -256,6 +258,8 @@ void nas_acl_table::allowed_actions_c_cpy (size_t action_count,
         action_list[count] = action;
         count++;
     }
+
+    return true;
 }
 
 
@@ -304,12 +308,18 @@ void* nas_acl_table::alloc_fill_ndi_obj (nas::mem_alloc_helper_t& mem_trakr)
 
     ndi_tbl_p->filter_count = allowed_filters_count ();
     ndi_tbl_p->filter_list = mem_trakr.alloc<BASE_ACL_MATCH_TYPE_t> (ndi_tbl_p->filter_count);
-    allowed_filters_c_cpy (ndi_tbl_p->filter_count, ndi_tbl_p->filter_list);
+    if (!allowed_filters_c_cpy (ndi_tbl_p->filter_count, ndi_tbl_p->filter_list)) {
+        throw nas::base_exception {NAS_ACL_E_FAIL, __PRETTY_FUNCTION__,
+                                   "Failed to copy allowed filters"};
+    }
 
     ndi_tbl_p->action_count = allowed_actions_count();
     if (ndi_tbl_p->action_count > 0) {
         ndi_tbl_p->action_list = mem_trakr.alloc<BASE_ACL_ACTION_TYPE_t> (ndi_tbl_p->action_count);
-        allowed_actions_c_cpy(ndi_tbl_p->action_count, ndi_tbl_p->action_list);
+        if (!allowed_actions_c_cpy(ndi_tbl_p->action_count, ndi_tbl_p->action_list)) {
+            throw nas::base_exception {NAS_ACL_E_FAIL, __PRETTY_FUNCTION__,
+                                       "Failed to copy allowed actions"};
+        }
     }
 
     ndi_tbl_p->stage = stage();

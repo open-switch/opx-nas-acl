@@ -1,3 +1,15 @@
+opx-nas-acl (2.3.0) unstable; urgency=medium
+
+  * Update: Added support to read both byte and packet counter value
+  * Update: Used new function to get LAG oid
+  * Update: support drop-bit qualifier
+  * Update: Add basic CPS handling for "next-hop delete ACL entries" RPC.
+  * Update: call handler function to delete matching pbr entries
+  * Update: remove pbr action, leave the acl entry in NAS-ACL
+  * Bugfix: rewrite the code to avoid accidentally convert ACTION DELETE to CREATE
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Wed, 13 Dec 2017  11:00:00 -0800
+
 opx-nas-acl (2.2.0) unstable; urgency=medium
 
   * Update: Added packet color actions

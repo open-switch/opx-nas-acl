@@ -168,16 +168,20 @@ t_std_error nas_acl_stats_info_get (cps_api_get_params_t *param,
     const nas::npu_set_t& loop_npu = (filtr_npu_list.empty()) ? counter.npu_list():
                                                                 filtr_npu_list;
 
-    uint64_t  count;
+    uint64_t  byte_count, pkt_count;
+    bool byte_valid, pkt_valid;
     for (auto npu_id: loop_npu) {
 
-        if ((!filtr_count_mode || filtr_pkt_count) &&
-            (counter.get_pkt_count_ndi(npu_id,  &count) == NAS_ACL_E_NONE)) {
-            total_pkt_count += count;
+        if (counter.get_count_ndi(npu_id, byte_valid, &byte_count,
+                                  pkt_valid, &pkt_count) != NAS_ACL_E_NONE) {
+            return NAS_ACL_E_FAIL;
         }
-        if ((!filtr_count_mode || filtr_byte_count) &&
-            (counter.get_byte_count_ndi(npu_id,  &count) == NAS_ACL_E_NONE)) {
-            total_byte_count += count;
+
+        if ((!filtr_count_mode || filtr_pkt_count) && pkt_valid) {
+            total_pkt_count += pkt_count;
+        }
+        if ((!filtr_count_mode || filtr_byte_count) && byte_valid) {
+            total_byte_count += byte_count;
         }
         if (!cps_api_object_attr_add_u32 (obj,
                                           BASE_ACL_STATS_NPU_ID_LIST, npu_id)) {

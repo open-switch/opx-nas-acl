@@ -1066,6 +1066,23 @@ static const auto& _filter_map = *new nas_acl_filter_map_t
             &nas_acl_filter_t::set_u8_filter_val,
         },
     },
+
+    {BASE_ACL_MATCH_TYPE_DROP_MARKED,
+        {
+            "MATCH_TYPE_DROP_MARKED",
+            {
+                BASE_ACL_ENTRY_MATCH_DROP_MARKED_VALUE,
+                NAS_ACL_DATA_U32,
+                sizeof (uint32_t),
+                NAS_ACL_ATTR_MODE_OPTIONAL,
+                {false, true},
+            },
+            {},
+            &nas_acl_filter_t::get_u32_filter_val,
+            &nas_acl_filter_t::set_u32_filter_val,
+        },
+    },
+
 };
 
 // Return name of given filter type id

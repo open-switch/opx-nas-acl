@@ -34,6 +34,14 @@
 #include "nas_udf.h"
 #include <map>
 #include <unordered_map>
+#include <vector>
+
+struct pbr_entry_id_t
+{
+    nas_obj_id_t tbl_id;
+    nas_obj_id_t entry_id;
+
+};
 
 class nas_acl_switch : public nas::base_switch_t
 {
@@ -166,6 +174,9 @@ class nas_acl_switch : public nas::base_switch_t
         nas_acl_range& save_acl_range(nas_acl_range&& acl_range) noexcept;
         void remove_acl_range(nas_obj_id_t id) noexcept;
 
+        void delete_pbr_action_by_nh_obj (ndi_obj_id_t nh_obj_id) noexcept;
+        void add_pbr_entry_to_cache(nas_obj_id_t tbl_id, nas_obj_id_t entry_id);
+        void del_pbr_entry_from_cache(nas_obj_id_t tbl_id, nas_obj_id_t entry_id);
     private:
 
         struct acl_table_container_t
@@ -195,6 +206,10 @@ class nas_acl_switch : public nas::base_switch_t
         range_list_t              _range_objs;
 
         nas::id_generator_t     _range_id_gen {NAS_ACL_RANGE_ID_MAX};
+
+        // cache content: <table-id, entry-id>
+        std::vector<pbr_entry_id_t> _cached_pbr_entries;
+
 };
 
 #endif

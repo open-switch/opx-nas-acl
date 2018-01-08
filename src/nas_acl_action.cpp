@@ -292,10 +292,13 @@ void nas_acl_action_t::set_action_ifindex (const nas_acl_common_data_list_t& dat
     if (nas_acl_utl_is_ifidx_type_lag (ifindex)) {
 
         nas::ndi_obj_id_table_t tmp_ndi_oid_tbl;
-        if (dn_nas_lag_get_ndi_ids (ifindex, &tmp_ndi_oid_tbl) != STD_ERR_OK) {
+        lag_id_t lag_id;
+        if (nas_get_lag_id_from_if_index(ifindex, &lag_id) != STD_ERR_OK) {
            throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
-                                      "Failed to get LAG NDI IDs"};
+                                      "Failed to get LAG NDI ID"};
         }
+        //@TODO to retrive NPU ID in multi npu case
+        tmp_ndi_oid_tbl.insert({0, static_cast<ndi_obj_id_t>(lag_id)});
         auto oid = static_cast <nas_obj_id_t> (ifindex);
         nas_acl_obj_key_t obj_key;
         memset(&obj_key, 0, sizeof(obj_key));
@@ -308,6 +311,7 @@ void nas_acl_action_t::set_action_ifindex (const nas_acl_common_data_list_t& dat
         // Convert to NPU and port
         interface_ctrl_t  intf_ctrl {};
         nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
+
         _a_info.values_type              = NDI_ACL_ACTION_PORT;
 
         _a_info.values.ndi_port.npu_id   = intf_ctrl.npu_id;
@@ -659,4 +663,18 @@ void nas_acl_action_t::dbg_dump () const
         default:
             break;
     }
+}
+
+bool nas_acl_action_t::match_opaque_data_by_nexthop_id(ndi_obj_id_t ndi_obj_id)
+{
+
+    for (auto& nh2ndi_oid_pair: _nas2ndi_oid_tbl) {
+        nas::ndi_obj_id_table_t  ndi_obj_id_table = nh2ndi_oid_pair.second;
+        for (auto & ndi_obj_id_pair: ndi_obj_id_table) {
+            if (ndi_obj_id_pair.second == ndi_obj_id)
+                return true;
+        }
+    }
+
+    return false;
 }

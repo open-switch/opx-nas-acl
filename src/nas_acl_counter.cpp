@@ -220,42 +220,29 @@ bool nas_acl_counter_t::_validate_entry_counter (counter c_type, npu_id_t npu_id
     return true;
 }
 
-t_std_error nas_acl_counter_t::get_pkt_count_ndi (npu_id_t npu_id,
-                                                  uint64_t* pkt_count_p) const noexcept
+t_std_error nas_acl_counter_t::get_count_ndi (npu_id_t npu_id,
+                                              bool& byte_count_valid,
+                                              uint64_t* byte_count_p,
+                                              bool& pkt_count_valid,
+                                              uint64_t* pkt_count_p) const noexcept
 {
     t_std_error rc = STD_ERR_OK;
     ndi_obj_id_t ndi_counter_id = 0;
 
-    if (!_validate_entry_counter (counter::PKT, npu_id, &ndi_counter_id)) {
-        return NAS_ACL_E_INCONSISTENT;
+    if (byte_count_p == nullptr || pkt_count_p == nullptr) {
+        NAS_ACL_LOG_ERR("NULL pointer was not accepted as input argument");
+        return NAS_ACL_E_ATTR_VAL;
     }
 
-    if ((rc = ndi_acl_counter_get_pkt_count (npu_id, ndi_counter_id,
-                                             pkt_count_p))
+    byte_count_valid = _validate_entry_counter (counter::BYTE, npu_id, &ndi_counter_id);
+    pkt_count_valid = _validate_entry_counter (counter::PKT, npu_id, &ndi_counter_id);
+
+    if ((rc = ndi_acl_counter_get_count (npu_id, ndi_counter_id,
+                                         byte_count_valid ? byte_count_p : nullptr,
+                                         pkt_count_valid ? pkt_count_p : nullptr))
         != STD_ERR_OK) {
 
         NAS_ACL_LOG_ERR ("NDI Packet counter Get returned error %d for NPU %d\n",
-                         rc, npu_id);
-        return rc;
-    }
-    return NAS_ACL_E_NONE;
-}
-
-t_std_error nas_acl_counter_t::get_byte_count_ndi (npu_id_t npu_id,
-                                               uint64_t* byte_count_p) const noexcept
-{
-    t_std_error rc = STD_ERR_OK;
-    ndi_obj_id_t ndi_counter_id = 0;
-
-    if (!_validate_entry_counter (counter::BYTE, npu_id, &ndi_counter_id)) {
-        return NAS_ACL_E_INCONSISTENT;
-    }
-
-    if ((rc = ndi_acl_counter_get_byte_count (npu_id, ndi_counter_id,
-                                             byte_count_p))
-        != STD_ERR_OK) {
-
-        NAS_ACL_LOG_ERR ("NDI Byte counter Get returned error %d for NPU %d\n",
                          rc, npu_id);
         return rc;
     }

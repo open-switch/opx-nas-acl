@@ -127,6 +127,10 @@ cps_api_return_code_t nas_acl_cps_api_rollback (void * context,
                                                 cps_api_transaction_params_t * param,
                                                 size_t index_of_element_being_updated) noexcept;
 
+cps_api_return_code_t nas_acl_delete_nh_acl_entry_action (void *context,
+                        cps_api_transaction_params_t *param,
+                       size_t ix) noexcept;
+
 cps_api_object_attr_t nas_acl_get_attr (const cps_api_object_it_t& it,
                                         cps_api_attr_id_t attr_id, bool* is_dupl) noexcept;
 

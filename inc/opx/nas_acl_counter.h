@@ -56,8 +56,7 @@ public:
     bool                     is_obj_in_npu (npu_id_t  npu_id) const noexcept;
     bool following_table_npus () const noexcept {return _following_table_npus;}
 
-    t_std_error get_pkt_count_ndi(npu_id_t,  uint64_t*) const noexcept;
-    t_std_error get_byte_count_ndi(npu_id_t, uint64_t*) const noexcept;
+    t_std_error get_count_ndi(npu_id_t, bool&, uint64_t*, bool&, uint64_t*) const noexcept;
 
     bool is_pkt_count_enabled() const noexcept {return _enable_pkt_count;}
     bool is_byte_count_enabled() const noexcept {return _enable_byte_count;}

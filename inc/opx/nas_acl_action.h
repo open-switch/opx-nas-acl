@@ -150,6 +150,8 @@ class nas_acl_action_t
 
         bool operator!= (const nas_acl_action_t& second) const;
 
+        bool match_opaque_data_by_nexthop_id(ndi_obj_id_t ndi_obj_id);
+
     private:
         void _set_opaque_data (const nas_acl_common_data_list_t& data_list);
         bool _ndi_copy_one_obj_id (ndi_acl_entry_action_t& ndi_action,
