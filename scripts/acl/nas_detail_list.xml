@@ -27,6 +27,7 @@
           <allow-match>OUTER_VLAN_ID</allow-match>
           <allow-match>ICMP_TYPE</allow-match>
           <allow-match>ICMP_CODE</allow-match>
+          <allow-match>DST_IPV6</allow-match>
      </table>
 
      <entry tag="bgp-src-port">
@@ -98,6 +99,44 @@
          <priority>3</priority>
          <match type="IP_TYPE">
              <value>IPV4ANY</value>
+         </match>
+         <match type="IP_PROTOCOL">
+             <value>
+                 <data>89</data>
+             </value>
+         </match>
+     </entry>
+
+     <entry tag="ospfv3-all">
+         <match type="DST_IPV6">
+             <value>
+                 <addr>ff02::5</addr>
+             </value>
+         </match>
+         <match type="IP_PROTOCOL">
+             <value>
+                 <data>89</data>
+             </value>
+         </match>
+     </entry>
+
+     <entry tag="ospfv3-all-dr">
+         <match type="DST_IPV6">
+             <value>
+                 <addr>ff02::6</addr>
+             </value>
+         </match>
+         <match type="IP_PROTOCOL">
+             <value>
+                 <data>89</data>
+             </value>
+         </match>
+     </entry>
+
+     <entry tag="ospfv3-ucast">
+         <table>system-flow-stub</table>
+         <match type="IP_TYPE">
+             <value>IPV6ANY</value>
          </match>
          <match type="IP_PROTOCOL">
              <value>
