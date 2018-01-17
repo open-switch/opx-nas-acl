@@ -24,6 +24,7 @@
             <entry tag="ospf-ucast"         cpu-q="9" />
 	    <entry tag="ospfv3-ucast"       cpu-q="9" />
             <entry tag="icmp"               cpu-q="4" />
+            <entry tag="igmp"               cpu-q="4"  action="TRAP_TO_CPU"/>
             <entry tag="arp-reply"          cpu-q="6"  action="COPY_TO_CPU"/>
             <entry tag="arp-request"        cpu-q="5"  action="COPY_TO_CPU"/>
             <entry tag="arp-request-4095"   cpu-q="5"  action="COPY_TO_CPU"/>
@@ -41,6 +42,9 @@
             <entry tag="icmpv6-ra"          cpu-q="6" action="COPY_TO_CPU"/>
             <entry tag="icmpv6-ns"          cpu-q="5" action="COPY_TO_CPU"/>
             <entry tag="icmpv6-rs"          cpu-q="5" action="COPY_TO_CPU"/>
+            <entry tag="icmpv6-mld-query"   cpu-q="4" action="TRAP_TO_CPU"/>
+            <entry tag="icmpv6-mld-report"  cpu-q="4" action="TRAP_TO_CPU"/>
+            <entry tag="icmpv6-mld-done"    cpu-q="4" action="TRAP_TO_CPU"/>
             <entry tag="icmpv6"             cpu-q="4" />
         </table>
     </INGRESS>

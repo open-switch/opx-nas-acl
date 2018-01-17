@@ -156,6 +156,17 @@
          </match>
      </entry>
 
+     <entry tag="igmp">
+         <match type="IP_TYPE">
+             <value>IPV4ANY</value>
+         </match>
+         <match type="IP_PROTOCOL">
+             <value>
+                 <data>2</data>
+             </value>
+         </match>
+     </entry>
+
      <entry tag="arp-reply">
          <match type="IP_TYPE">
              <value>ARP_REPLY</value>
@@ -390,6 +401,69 @@
          <match type="ICMP_TYPE">
              <value>
                  <data>0x85</data>
+             </value>
+         </match>
+         <match type="ICMP_CODE">
+             <value>
+                 <data>0x00</data>
+             </value>
+         </match>
+     </entry>
+
+     <entry tag="icmpv6-mld-query">
+         <match type="IP_TYPE">
+             <value>IPV6ANY</value>
+         </match>
+         <match type="IP_PROTOCOL">
+             <value>
+                 <data>58</data>
+             </value>
+         </match>
+         <match type="ICMP_TYPE">
+             <value>
+                 <data>0x82</data>
+             </value>
+         </match>
+         <match type="ICMP_CODE">
+             <value>
+                 <data>0x00</data>
+             </value>
+         </match>
+     </entry>
+
+     <entry tag="icmpv6-mld-report">
+         <match type="IP_TYPE">
+             <value>IPV6ANY</value>
+         </match>
+         <match type="IP_PROTOCOL">
+             <value>
+                 <data>58</data>
+             </value>
+         </match>
+         <match type="ICMP_TYPE">
+             <value>
+                 <data>0x83</data>
+             </value>
+         </match>
+         <match type="ICMP_CODE">
+             <value>
+                 <data>0x00</data>
+             </value>
+         </match>
+     </entry>
+
+     <entry tag="icmpv6-mld-done">
+         <match type="IP_TYPE">
+             <value>IPV6ANY</value>
+         </match>
+         <match type="IP_PROTOCOL">
+             <value>
+                 <data>58</data>
+             </value>
+         </match>
+         <match type="ICMP_TYPE">
+             <value>
+                 <data>0x84</data>
              </value>
          </match>
          <match type="ICMP_CODE">

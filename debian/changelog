@@ -1,6 +1,12 @@
+opx-nas-acl (2.4.0) unstable; urgency=medium
+
+  * Update: Added ACL rules for BASE to support/lift IGMP and MLD packets for snooping feature
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Wed, 15 Jan 2018  23:00:00 -0800
+
 opx-nas-acl (2.3.0+opx1) unstable; urgency=medium
 
-   * Update: Add ACL OSPFv3 system flow entries
+  * Update: Add ACL OSPFv3 system flow entries
 
  -- Dell EMC <ops-dev@lists.openswitch.net>  Wed, 15 Jan 2018  11:00:00 -0800
 
