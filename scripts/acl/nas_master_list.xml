@@ -17,12 +17,12 @@
         <table tag="system-flow" priority="11">
             <entry tag="bgp-src-port"       cpu-q="9" />
             <entry tag="bgp-dst-port"       cpu-q="9" />
-            <entry tag="ospf-all"           cpu-q="11"  action="COPY_TO_CPU"/>
-            <entry tag="ospf-all-dr"        cpu-q="11"  action="COPY_TO_CPU"/>
-            <entry tag="ospfv3-all"         cpu-q="11"  action="COPY_TO_CPU"/>
-            <entry tag="ospfv3-all-dr"      cpu-q="11"  action="COPY_TO_CPU"/>
-            <entry tag="ospf-ucast"         cpu-q="9" />
-	    <entry tag="ospfv3-ucast"       cpu-q="9" />
+            <entry tag="ospf-all"           cpu-q="9"  action="COPY_TO_CPU"/>
+            <entry tag="ospf-all-dr"        cpu-q="9"  action="COPY_TO_CPU"/>
+            <entry tag="ospfv3-all"         cpu-q="9"  action="COPY_TO_CPU"/>
+            <entry tag="ospfv3-all-dr"      cpu-q="9"  action="COPY_TO_CPU"/>
+            <entry tag="ospf-ucast"         cpu-q="6" />
+            <entry tag="ospfv3-ucast"       cpu-q="6" />
             <entry tag="icmp"               cpu-q="4" />
             <entry tag="igmp"               cpu-q="4"  action="TRAP_TO_CPU"/>
             <entry tag="arp-reply"          cpu-q="6"  action="COPY_TO_CPU"/>
