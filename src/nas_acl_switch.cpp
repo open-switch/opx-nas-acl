@@ -24,6 +24,7 @@
 #include "nas_acl_switch.h"
 #include "event_log.h"
 #include <string>
+#include <inttypes.h>
 
 nas_acl_table& nas_acl_switch::get_table (nas_obj_id_t tbl_id)
 {
@@ -143,18 +144,28 @@ void nas_acl_switch::delete_pbr_action_by_nh_obj (ndi_obj_id_t nh_obj_id) noexce
                 entry_list.push_back(acl_entry);
             }
 
+        } catch (std::exception& ex) {
+            NAS_ACL_LOG_ERR("Failure on checking PBR entry: table_id %" PRId64 \
+                            " entry_id %" PRId64 " ex - %s",
+                            pbr_entry_id.tbl_id, pbr_entry_id.entry_id, ex.what());
         } catch (...) {
         }
     }
 
     for (auto entry: entry_list) {
-        nas_acl_entry new_entry(*entry);
+        try {
+            nas_acl_entry new_entry(*entry);
 
-        new_entry.remove_action(BASE_ACL_ACTION_TYPE_REDIRECT_IP_NEXTHOP);
+            new_entry.remove_action(BASE_ACL_ACTION_TYPE_REDIRECT_IP_NEXTHOP);
 
-        new_entry.commit_modify(*entry, false);
+            new_entry.commit_modify(*entry, false);
 
-        entry->get_table().get_switch().save_entry(std::move(new_entry));
+            entry->get_table().get_switch().save_entry(std::move(new_entry));
+        } catch (std::exception& ex) {
+            NAS_ACL_LOG_ERR("Failure on removing IP_NEXTHOP action: entry_id %" PRId64 \
+                            "ex - %s", entry->entry_id(), ex.what());
+        } catch (...) {
+        }
 
     }
 

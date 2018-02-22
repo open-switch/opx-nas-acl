@@ -1,3 +1,9 @@
+opx-nas-acl (2.4.0+opx2) unstable; urgency=medium
+
+  * Update: Added exception handling for NEXTHOP action delete
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Mon, 19 Feb 2018  18:00:00 -0800
+
 opx-nas-acl (2.4.0+opx1) unstable; urgency=medium
 
   * Change cpu-q values for ospf and ospfv3

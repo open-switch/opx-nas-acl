@@ -258,7 +258,10 @@ entry_attr_map = {
     'action/REDIRECT_PORT_VALUE': ('leaf', 'intf'),
 
     'action/IP_NEXTHOP_GROUP_VALUE': ('container',),
-    'action/IP_NEXTHOP_GROUP_VALUE/id': ('leaf', 'uint64_t'),
+    'action/IP_NEXTHOP_GROUP_VALUE/vrf_id': ('leaf', 'uint32_t'),
+    'action/IP_NEXTHOP_GROUP_VALUE/af': ('leaf', 'enum', 'base-acl:af-type:'),
+    'action/IP_NEXTHOP_GROUP_VALUE/dest-addr/base-cmn/ipv4-address': ('leaf', 'ipv4'),
+    'action/IP_NEXTHOP_GROUP_VALUE/dest-addr/base-cmn/ipv6-address': ('leaf', 'ipv6'),
     'action/IP_NEXTHOP_GROUP_VALUE/data': ('leaf', 'opaque'),
 
     'action/MIRROR_INGRESS_VALUE': ('list',),
@@ -431,6 +434,9 @@ enum_map = {
     'base-acl:packet-color:GREEN': 1,
     'base-acl:packet-color:YELLOW': 2,
     'base-acl:packet-color:RED': 3,
+
+    'base-acl:af-type:INET': 2,
+    'base-acl:af-type:INET6': 10,
 }
 
 

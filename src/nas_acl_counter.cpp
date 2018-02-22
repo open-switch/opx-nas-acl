@@ -197,13 +197,13 @@ bool nas_acl_counter_t::_validate_entry_counter (counter c_type, npu_id_t npu_id
     switch (c_type) {
         case counter::PKT:
             if (!is_pkt_count_enabled ()) {
-                NAS_ACL_LOG_ERR ("Packet counter NOT enabled for counter %ld\n", counter_id());
+                NAS_ACL_LOG_DETAIL ("Packet counter NOT enabled for counter %ld\n", counter_id());
                 return false;
             }
             break;
         case counter::BYTE:
             if (!is_byte_count_enabled ()) {
-                NAS_ACL_LOG_ERR ("Byte counter NOT enabled for counter %ld\n", counter_id());
+                NAS_ACL_LOG_DETAIL ("Byte counter NOT enabled for counter %ld\n", counter_id());
                 return false;
             }
             break;

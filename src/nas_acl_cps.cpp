@@ -460,7 +460,12 @@ nas_acl_delete_nh_acl_entry_action (void               *context,
     }
     NAS_ACL_LOG_BRIEF(" Found NH opaque data %lld ", it->second);
 
-    nas_acl_delete_pbr_action_by_nh_obj(0, it->second);
+    try {
+        nas_acl_delete_pbr_action_by_nh_obj(0, it->second);
+    } catch (std::exception& ex) {
+        NAS_ACL_LOG_ERR("Failed to delete PBR action: %s", ex.what());
+    } catch (...) {
+    }
 
     NAS_ACL_LOG_BRIEF("Delete next hop ACL entry action EXITS");
 
