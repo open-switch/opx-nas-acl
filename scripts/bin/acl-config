@@ -36,9 +36,9 @@ _key_for_cfg = cps.key_from_name('target',_KEY)
 _key_for_reload = cps.key_from_name('target','acl-config/reload')
 
 
-_valid_match_fields_in=['SRC_IP','DST_IP','IN_PORT','OUT_PORT','L4_SRC_PORT','L4_DST_PORT','SRC_MAC','DST_MAC']
+_valid_match_fields_in=['SRC_IP','DST_IP','OUT_INTF','SRC_INTF','L4_SRC_PORT','L4_DST_PORT','SRC_MAC','DST_MAC','IP_PROTOCOL','TCP_FLAGS']
 
-_valid_match_fields_eg=['SRC_IP','DST_IP','IN_PORT','OUT_PORT','L4_SRC_PORT','L4_DST_PORT','SRC_MAC','DST_MAC']
+_valid_match_fields_eg=['DST_IP', 'L4_SRC_PORT', 'L4_DST_PORT', 'IP_PROTOCOL', 'OUT_INTF']
 
 _default_table_prio = 110
 _default_entry_prio = 30
@@ -50,7 +50,6 @@ __table_out = None
 def __get_table(type,fields):
     _table_id = nas_acl.create_table(stage=type,\
         prio=_default_table_prio, allow_filters=fields,only_if_not_exist=True)
-
     out = []
     if cps.get ([nas_acl.TableCPSObj (table_id=_table_id).data()], out) == True:
         if len(out) > 0:
@@ -111,12 +110,13 @@ def __get_acl_entries(table_id=None,entry_id=None):
 
 def __acl_cfg_to_acl_entry(obj, create_if_not_there=False):
     obj = cps_object.CPSObject(obj=obj)
-
     _name = obj.get_attr_data('name')
     _rule = obj.get_attr_data('rule')
     try:
         _entry_id = obj.get_attr_data('base-acl/entry/id')
         _table_id = obj.get_attr_data('base-acl/table/id')
+        print ('Table-ID - %d' % _table_id, '---------', 'Entry-ID - %d' % _entry_id)
+
         _lst = __get_acl_entries(_table_id,_entry_id)
         if len(_lst) > 0:
             return obj.get()
@@ -127,17 +127,30 @@ def __acl_cfg_to_acl_entry(obj, create_if_not_there=False):
         _table_id = None
 
     l = _rule.strip().split(' ')
+    """
+    new_list = []
+    idx = 0
+    while idx < len(l):
+        item = l[idx]
+        new_list.append(item)
+        if item == '--tcp-flags' and  idx < len(l) - 2:
+            new_list.append(l[idx + 1] + ' ' + l[idx + 2])
+            idx += 2
+        idx += 1
+    l = new_list 
+    """
     _parser = argparse.ArgumentParser('Process ACL rules')
 
     _parser.add_argument('-prio','--priority',help='The rule priority',action='store',required=False)
-    _parser.add_argument('-i','--in-interface',help='The incoming interface name',action='append',required=False)
-    _parser.add_argument('-o','--out-interface',help='The outgoing interface name (same as the -i option) at this point',action='append',required=False)
+    _parser.add_argument('-i','--in-interface',help='The incoming interface name',action='store',required=False)
+    _parser.add_argument('-o','--out-interface',help='The outgoing interface name (same as the -i option) at this point',action='store',required=False)
     _parser.add_argument('-j', '--jump',help='The action assocaiated with the rule ACCEPT or DROP',choices=['DROP','ACCEPT','ACCEPT-TRAP','TRAP'],action='store',required=True)
     _parser.add_argument('-I','-A',help='The INPUT or OUTPUT chain which maps to the INGRESS or EGRESS tables',choices=['INPUT','OUTPUT'],required=True)
     _parser.add_argument('-p', '--protocol',help='The IP protocol type (TCP/UDP/ICMP)',action='store')
     _parser.add_argument('-d', '--destination',help='Specify the destination IPv4/IPv6 address',action='store')
     _parser.add_argument('--dport',help='Specify the destination port number',action='store')
     _parser.add_argument('--sport',help='Specify the source port number',action='store')
+    _parser.add_argument('--tcp-flags',nargs='+',help='Specify the TCP flags like SYNC,RST,ACK,FIN,SYN',action='store')
     _parser.add_argument('-s', '--source',help='Specify the source IPv4/IPv6 address',action='store')
     _parser.add_argument('--mac-source',help='The source MAC address',action='store')
     _parser.add_argument('--mac-destination',help='The destination MAC address',action='store')
@@ -145,7 +158,6 @@ def __acl_cfg_to_acl_entry(obj, create_if_not_there=False):
 
     _args = vars(_parser.parse_args(l))
     print "***"
-    print _args
     if 'A' in _args:
         _args['I'] = _args['A']
     _table = None
@@ -199,12 +211,43 @@ def __acl_cfg_to_acl_entry(obj, create_if_not_there=False):
             'addr' : _addrs[0],
             'mask' : _addrs[1]
         }
+    def tcp_flags_bitmap(tcp_flags):
+        bm = 0x0
+        flag_masks = {'FIN': 0x1, 'SYN': 0x2, 'RST': 0x4, 'ACK': 0x10, 'ALL': 0x17}
+        for flag in tcp_flags.strip().split(','):
+            if flag in flag_masks:
+                bm |= flag_masks[flag]
+        return bm
+    if _args['tcp_flags'] !=None:
+        mask = tcp_flags_bitmap(_args['tcp_flags'][0])
+        if len(_args['tcp_flags']) > 1:
+            data = tcp_flags_bitmap(_args['tcp_flags'][1])
+        else:
+            data = 0
+        _filters['TCP_FLAGS'] = {'data': data, 'mask': mask}
+
+
+    if _args['in_interface']!=None:
+        _filters['SRC_INTF'] = _args['in_interface']
+
+    if _args['out_interface']!=None:
+        _filters['OUT_INTF'] = _args['out_interface']
+    
+    if _args['protocol']!=None:
+        with open('/etc/protocols') as f:
+            for line in f:
+                parts=line.split()
+                if _args['protocol'] in line:
+                    if _args['protocol'] == parts[0]:
+                       _filters['IP_PROTOCOL'] = parts[1] 
+                    
 
     if _args['sport']!=None:
         _filters['L4_SRC_PORT']=_args['sport']
 
     if _args['dport']!=None:
         _filters['L4_DST_PORT'] = _args['dport']
+
 
     _actions = {}
     if _args['jump']!=None and _args['jump'] == 'DROP':
@@ -222,13 +265,11 @@ def __acl_cfg_to_acl_entry(obj, create_if_not_there=False):
     else:
         _prio = _default_entry_prio
 
-    print('Attempting to local ACL entry')
+    print('Creating ACL entry')
     _entry = nas_acl.find_entry(table_id=_table.extract_id(),priority=_prio,\
                 filter_map=_filters,action_map=_actions)
     if _entry != None:
-        _obj = cps_object.CPSObject(obj=_entry.data())
-        #_entry_id = _obj.get_attr_data('base-acl/entry/id')
-        #_table_id = _obj.get_attr_data('base-acl/table/id')
+        _obj = cps_object.CPSObject(obj=_entry)
         obj.add_attr('base-acl/entry/id',_obj.get_attr_data('base-acl/entry/id'))
         obj.add_attr('base-acl/table/id',_table.extract_id())
 
@@ -307,15 +348,11 @@ def __sync_file_to_db(filename):
 
         if _name in _objs:
             if _rule == _objs[_name].get_attr_data('rule'):
-                #print(_objs[_name].get(), "And ", _i, "Are the same")
                 _db_map[_name] = _i
                 continue
-            #print('Entries are different ' , _i,_objs[_name].get())
-        #print('Existing DB entry targeted to be removed ' , _i)
         __mark_dirty(_i)
 
     for _i in _db:
-        #_entry = __find_entry(_i)
         if __is_dirty(_i):
             _i['operation']='delete'
             cps.db_commit(_i,None,True)
@@ -334,11 +371,9 @@ def __resync():
 
     _entries = __get_acl_entries( __table_in.extract_id()) + \
         __get_acl_entries( __table_out.extract_id())
-
     _m = {}
 
     for _i in _entries:
-        print (_i)
         _o = cps_object.CPSObject(obj=_i)
         _acl = _o.get_attr_data('base-acl/entry/id')
         _table = _o.get_attr_data('base-acl/entry/table-id')
@@ -365,11 +400,9 @@ def __resync():
 
 # CPS Get handler
 def get_status_cb(methods, params):
-    print params
     key = params['filter']['key']
 
     _db = __get_db_objs()
-    print _db
     for _i in _db:
         params['list'].append(_i)
 
@@ -425,7 +458,7 @@ if not __validate_table():
 print ('INPUT - Table ID %d' % __table_in.extract_id())
 print ('OUTPUT - Table ID %d' % __table_out.extract_id())
 
-__sync_file_to_db('acl-config.yaml')
+__sync_file_to_db('/usr/bin/acl-config.yaml')
 __resync()
 
 

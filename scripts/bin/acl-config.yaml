@@ -1,6 +1,9 @@
 #ACL Configuration File
+#Example of an ACL entry is below
+#ACL Entries:
+#        - block-unicast -A INPUT -p tcp -i e101-025-1 -d 20.1.1.2/255.255.255.255 -j DROP
+#        - icmp-output -A INPUT -p icmp -i e101-011-0 -j DROP
+#        - drops-pkt -A OUTPUT -o e101-011-0 -d 30.1.1.2/255.255.255.255 -j DROP
+#        - block-syn -A INPUT -i e101-025-2 -p tcp --tcp-flags SYN,ACK -j DROP
 
 ACL Entries:
-	- block-unknown -A INPUT -p ssh -m mac --mac-source 00:00:00:00:00:001 --dport 80 -j DROP
-	- more-bad -A INPUT -p ssh -m mac --mac-source 00:00:00:00:00:001 --dport 80 -j DROP
-	- http -A INPUT -p tcp --dport 80 -j ACCEPT

@@ -102,17 +102,22 @@ def find_entry(table_id=None, entry_id=None,priority=None,filter_map={},\
         return
     for e_cps in r:
         def __cmp_maps(to_o, from_o):
-            print('Comparing ',to_o,from_o)
             for _ent in from_o.keys():
                 _rhs_data = from_o[_ent]
-                if _ent not in to_o:  return False
-                _lhs_data = to_o[_ent]
+                if _ent not in to_o:
+                    if 'cps/key_data' in to_o and _ent in to_o['cps/key_data']:
+                        _lhs_data = to_o['cps/key_data'][_ent]
+                    else:
+                        return False
+                else:
+                    _lhs_data = to_o[_ent]
 
                 if type(_lhs_data) != type(_rhs_data): return False
-                if type(dict) == type(_lhs_data):
-                    __cmp_maps(_lhs_data,_rhs_data)
+                if type(_lhs_data) is dict:
+                    if not __cmp_maps(_lhs_data,_rhs_data):
+                        return False
 
-                if type(_lhs_data) == type([]):
+                if type(_lhs_data) is list:
                     if len(_lhs_data)!=len(_rhs_data): return False
                     for _ix in range(0,len(_lhs_data)):
                          #first item
@@ -126,7 +131,7 @@ def find_entry(table_id=None, entry_id=None,priority=None,filter_map={},\
             print('Not the same',e_cps['data'], 'and',_ent_data['data'])
             continue
 
-        return e_cps['data']
+        return e_cps
     return None
 
 
@@ -163,19 +168,15 @@ def create_table(stage, prio, allow_filters, allow_actions=None, name=None, size
 
 
 def create_entry(table_id, prio, filter_map, action_map, name=None, switch_id=0):
-
     e = EntryCPSObj(table_id=table_id, priority=prio, entry_id=name,
                     switch_id=switch_id)
-
     for ftype, fval in filter_map.items():
         e.add_match_filter(filter_type=ftype, filter_val=fval)
 
     for atype, aval in action_map.items():
         e.add_action(action_type=atype, action_val=aval)
-
     upd = ('create', e.data())
     r = cps_utils.CPSTransaction([upd]).commit()
-
     if r == False:
         raise RuntimeError("Entry create failed")
 
@@ -212,7 +213,6 @@ def append_entry_filter(table_id, entry_id, filter_type, filter_val):
 
     if r == False:
         raise RuntimeError("Entry filter append failed")
-
 # Change existing filter value in the ACL entry
 
 
@@ -254,6 +254,8 @@ def append_entry_action(table_id, entry_id, action_type, action_val):
 
     if r == False:
         raise RuntimeError("Entry action append failed")
+    else:
+        print "Appended the action %s with value %d to %d and %d" %(action_type,action_val,table_id,entry_id)    
 
 
 # Change existing action value in the ACL entry
@@ -375,6 +377,8 @@ def delete_counter(table_id, counter_id):
 
     if r == False:
         raise RuntimeError("Counter delete failed")
+    else:
+        print "Successfully Deleted the counter for table_id %d and counter_id %d" %(table_id,counter_id)
 
 
 def delete_table(table_id):

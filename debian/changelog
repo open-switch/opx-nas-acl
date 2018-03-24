@@ -1,3 +1,9 @@
+opx-nas-acl (2.4.0+opx3) unstable; urgency=medium
+
+  * Update: Added ACL persistency changes
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Fri, 23 Mar 2018  17:36:00 -0800
+
 opx-nas-acl (2.4.0+opx2) unstable; urgency=medium
 
   * Update: Added exception handling for NEXTHOP action delete

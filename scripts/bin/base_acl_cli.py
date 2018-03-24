@@ -5,17 +5,17 @@ import argparse
 import sys
 import cps
 
-_valid_ops=['show-table','find-table','create-table','delete-table',\
-  'show-entry','find-entry','create-entry','delete-entry']
-_valid_match_fields=['SRC_IP','DST_IP','IN_PORT','OUT_PORT','L4_SRC_PORT','L4_DST_PORT']
+_valid_ops=['show-table','show-entry','delete-entry','delete-table','create-counter','append-counter','delete-counter','show-stats']
+_valid_match_fields=['SRC_IP','DST_IP','OUT_INTF','SRC_MAC','DST_MAC','L4_SRC_PORT','L4_DST_PORT','SRC_INTF','IP_PROTOCOL']
+
 _valid_stages=['EGRESS','INGRESS']
-_entry_actions=['DROP']
+_entry_actions=['DROP','FORWARD','COPY_TO_CPU','COPY_TO_CPU_AND_FORWARD']
 
 parser = argparse.ArgumentParser(description='This tool will perform ACL \
 	related command line operations',formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument('-op',choices=_valid_ops,help='Show all acl entries \
 	in the table',action='store',required=True)
-parser.add_argument('-table-priority',action='store',type=int,help='The ACL table priority',required=False,default=120)
+parser.add_argument('-table-priority',action='store',type=int,help='The ACL table priority',required=False)
 parser.add_argument('-table-match',choices=_valid_match_fields,action='append',help='These are the possible match fields',required=False)
 parser.add_argument('-table-stage',help='This is the stage at which to install the ACL',choices=_valid_stages,required=False,default='INGRESS')
 
@@ -26,159 +26,84 @@ parser.add_argument('-entry-action',choices=_entry_actions,help='The action to t
 parser.add_argument('-entry-prio',help='The ACL entry priority',type=int,required=False)
 parser.add_argument('-entry-dipv4',help='The destination IPv4 (eg.. 1.1.1.1/255.255.255.0)',required=False)
 parser.add_argument('-entry-dport',help='The destination port',required=False)
+parser.add_argument('-i','--in_interface',help='The incoming interface id',action='store',required=False)
+parser.add_argument('-l','--lag_interface',help='The incoming interface Lag id',action='store',required=False)
+parser.add_argument('-o','--out_interface',help='The outgoing interface id',action='store',required=False)
+parser.add_argument('--mac_source',help='The source MAC address',action='store',required=False)
+parser.add_argument('-p','--protocol',help='The IP protocol type (TCP/UDP/ICMP)',action='store')
+parser.add_argument('--mac_destination',help='The destination MAC address',action='store',required=False)
 parser.add_argument('-table-id',help='The table ID',required=False)
 parser.add_argument('-entry-id',help='The entry ID',required=False)
+parser.add_argument('-counter-id',help='Get the counter id from create-counter function',required=False)
+
+
 
 parser.add_argument('-d',help='Enable debug operations',action='store_true',required=False)
 _args = vars(parser.parse_args())
+
 
 def __show_table():
   print "ACL Tables display..."
   print "Key is the instance ID of the acl table"
   nas_acl.print_table()
 
-def __find_table():
-  _table = nas_acl.find_table(priority=_args['table_priority'],\
-      matchfields=_args['table_match'],\
-      table_stage=_args['table_stage'])
-  return _table
 
-def __find_table_show():
-  _table = __find_table()
-  if _table==None:
-    print 'Not found'
+def __create_counter():
+  if _args['table_id']==None:
+    print('Missing mandatory attributes to create counter-Required table-id')
     sys.exit(1)
-  _table.print_obj()
+  counter_id = nas_acl.create_counter(table_id=int(_args['table_id']),types=['PACKET'])
+  return counter_id
 
-def __create_table():
-  if _args['table_stage']==None or _args['table_priority']==None or _args['table_match']==None:
-    print('Missing manditory attributes to create table')
+def __append_counter():
+    if _args['table_id']==None or _args['entry_id']==None or _args['counter_id']==None:
+        print('Missing mandatory attributes to append the counter id to entry- Required table-id, entry-id and counter-id')
+        sys.exit(1)
+    nas_acl.append_entry_action(int(_args['table_id']),int(_args['entry_id']),'SET_COUNTER',int(_args['counter_id']))
+
+
+
+def __delete_counter():
+  if _args['table_id']==None or _args['counter_id']==None:
+    print('Missing attributes-provide table-id and counter-id as arguments')
     sys.exit(1)
-  _table_id = nas_acl.create_table(stage=_args['table_stage'],\
-      prio=_args['table_priority'],\
-      allow_filters=_args['table_match'],only_if_not_exist=True)
-
-  _table = nas_acl.TableCPSObj (table_id=_table_id)
-  out = []
-  if cps.get ([_table.data()], out) == True:
-      for t_cps in out:
-        t = nas_acl.TableCPSObj (cps_data = t_cps)
-        _table = t
-
-  return _table
-
-def __create_table_show():
-  _table = __create_table()
-  if _table!=None:
-    _table.print_obj()
-  else:
-    print('Error creating table')
+  nas_acl.delete_counter(int(_args['table_id']),int(_args['counter_id']))
   sys.exit(0)
 
+def __show_stats():
+  if _args['table_id']==None or _args['counter_id']==None:
+    print ('Missing attributes to show stats - Needed table-id and counter-id')
+    sys.exit(1)
+  nas_acl.print_stats(int(_args['table_id']),int(_args['counter_id']))
+
+
 def __delete_table():
-  _table = nas_acl.find_table(priority=_args['table_priority'],matchfields=_args['table_match'],\
-        table_stage=_args['table_stage'])
-  if _table!=None:
-    _id = _table.extract_id()
-    nas_acl.delete_table(_id)
-    print('Table deleted...')
+  if _args['table_id']==None:
+    print('Missing mandatory attributes to delete table- required table-id and prerequisit is to delete the entry before deleting table using delete-entry')
+    sys.exit(1)
+  nas_acl.delete_table(int(_args['table_id']))
+  print('Table deleted...')
   sys.exit(0)
 
 def __show_entry():
   nas_acl.print_entry()
 
-def __entry_create_filters():
-  """
-  Search through the args and create a filter dictionary for use with the ACLs
-  """
-  _filters={}
-  if _args['entry_sipv4']!=None:
-    _filters['SRC_IP']={ 'addr' : _args['entry_sipv4'],
-                        'mask' : _args['entry_smask4']}
-  if _args['entry_sport']!=None:
-    _filters['L4_SRC_PORT']=_args['entry_sport']
-
-  if _args['entry_dipv4']!=None:
-    _filters['DST_IP']={
-      'addr': _args['entry_dipv4'],
-      'mask': _args['entry_dmask4']
-      }
-  if _args['entry_dport']!=None:
-    _filters['L4_DST_PORT'] = _args['entry_dport']
-  return _filters
-
-def __entry_create_actions():
-  """
-  Search through the args and create a action dictionary for use with the ACLs
-  """
-  _actions={}
-  if _args['entry_action']!=None:
-    _actions={'PACKET_ACTION': _args['entry_action']}
-  return _actions
-
-
-def __find_entry():
-  _table = __find_table()
-  if _table==None:
-    return None
-  _table_id = _table.extract_id()
-
-  _filters = __entry_create_filters()
-  _actions = __entry_create_actions()
-  _entry = nas_acl.find_entry(table_id=_table_id,priority=_args['entry_prio'],\
-    filters=_filters,actions=_actions)
-
-  return _entry
-
-def __find_entry_show():
-  _entry = __find_entry()
-  if _entry==None:
-    print('Entry is not found.')
+def __delete_entry():
+  if _args['table_id']==None or _args['entry_id']==None:
+    print('Missing mandatory attributes to delete entry - required table-id and entry-id')
     sys.exit(1)
-
-  _entry.print_obj()
-
-def __create_entry():
-  _entry = __find_entry()
-  if _entry!=None:
-    print('Exists already')
-    return
-  _table = __create_table()
-  _id = _table.extract_id()
-  _prio = _args['entry_prio']
-
-  _filters = __entry_create_filters()
-  _actions = __entry_create_actions()
-  if _args['d']:
-    print _filters
-    print _actions
-
-  if len(_filters)==0 or len(_actions)==0:
-    print("Incomplete entry parameters")
-    sys.exit(1)
-
-  _res = nas_acl.create_entry(_id,_prio,_filters,_actions)
-  print 'Created entry'
-
-def __delete_entry() :
-  _entry = __find_entry()
-  if _entry==None:
-    print('Missing or couldn\'t find match.')
-    sys.exit(1)
-  _table_id = _entry.extract('table-id')
-  _id = _entry.extract('id')
-  nas_acl.delete_entry(_table_id,_id)
+  nas_acl.delete_entry(int(_args['table_id']),int(_args['entry_id']))
   print ('Entry deleted')
 
 __ops={
   'show-table':__show_table,
-  'find-table':__find_table_show,
-  'create-table':__create_table,
+  'show-stats':__show_stats,
+  'append-counter':__append_counter,
+  'create-counter':__create_counter,
   'delete-table':__delete_table,
   'show-entry':__show_entry,
-  'find-entry':__find_entry_show,
-  'create-entry':__create_entry,
   'delete-entry':__delete_entry,
+  'delete-counter':__delete_counter,
 }
 
 def main():

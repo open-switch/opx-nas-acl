@@ -1,0 +1,18 @@
+[Unit]
+Description=OPX ACL Persistency service
+After=opx-pas.service opx-nas.service opx-acl-init.service opx-qos-init.service
+Wants=opx-pas.service opx-nas.service opx-acl-init.service opx-qos-init.service
+DefaultDependencies=no
+
+[Service]
+EnvironmentFile=/etc/opx/opx-environment
+ExecStart=/usr/bin/acl-config
+KillSignal=SIGKILL
+SuccessExitStatus=SIGKILL
+
+# Resource Limitations
+LimitCORE=infinity
+
+[Install]
+WantedBy=multi-user.target
+
