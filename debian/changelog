@@ -1,3 +1,10 @@
+opx-nas-acl (2.4.0+opx4) unstable; urgency=medium
+
+  * Update: Removed generic ACL config XML files in favor of per-platform ACL config files.
+  * Update: Modified base_create_acl_entries.py script to support "allow-action"
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Fri, 4 Apr 2018  11:36:00 -0800
+
 opx-nas-acl (2.4.0+opx3) unstable; urgency=medium
 
   * Update: Added ACL persistency changes

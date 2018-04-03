@@ -121,6 +121,9 @@ def apply_table_cfg(etree_table, stage, prio):
     for field in etree_table.findall('allow-match'):
         dbg_print("Add allow filter ", field.text)
         t.add_allow_filter(field.text)
+    for field in etree_table.findall('allow-action'):
+        dbg_print("Add allow action ", field.text)
+        t.add_allow_action(field.text)
 
     dbg_print(t.data())
     cps_upd = ('create', t.data())
