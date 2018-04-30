@@ -139,10 +139,10 @@ def apply_table_cfg(etree_table, stage, prio):
 
 cpu_q_data = {}
 cpu_ifs = []
-
+cpu_q_type = ''
 
 def get_cpu_q(q_num):
-    global cpu_q_data, cpu_ifs
+    global cpu_q_data, cpu_ifs, cpu_q_type
 
     if q_num in cpu_q_data:
         return cpu_q_data[q_num]
@@ -151,8 +151,20 @@ def get_cpu_q(q_num):
         cpu_ifs, cpu_ifnames = a_utl.get_cpu_port()
         print "CPU IFIndex, IfName = " + str(zip(cpu_ifs, cpu_ifnames))
 
-    return a_utl.qos_queue_get(cpu_ifs[0], q_num, 'MULTICAST')
+    qid = None
+    q_opq = None
+    if cpu_q_type == '':
+        for q_type in ['MULTICAST', 'NONE']:
+            try:
+                cpu_q_type = q_type
+                qid, q_opq = a_utl.qos_queue_get(cpu_ifs[0], q_num, cpu_q_type)
+                break
+            except RuntimeError as r:
+                continue
+    else:
+        qid, q_opq = a_utl.qos_queue_get(cpu_ifs[0], q_num, cpu_q_type)
 
+    return qid, q_opq
 
 def apply_entry_cfg(
         master_etree_entry, etree_entry, table_id, prio, table_name):

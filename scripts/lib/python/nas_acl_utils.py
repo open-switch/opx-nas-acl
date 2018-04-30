@@ -138,6 +138,8 @@ def qos_queue_get(ifidx, q_num, q_type):
     r = cps.get([flt.data()], ret)
     if r == False:
         raise RuntimeError("Queue Get failed")
+    if len(ret) < 1:
+        raise RuntimeError("Queue Get returned empty data")
 
     q = nas_qos.QueueCPSObj(cps_data=ret[0])
 
