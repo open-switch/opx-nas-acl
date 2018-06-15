@@ -1,7 +1,7 @@
 [Unit]
 Description=Default ACL entries for Control Plane Protocol packets
-After=opx-cps.service
-Wants=opx-cps.service
+After=opx-cps.service opx-nas.service
+Wants=opx-cps.service opx-nas.service
 
 [Service]
 EnvironmentFile=/etc/opx/opx-environment

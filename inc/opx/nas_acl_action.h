@@ -152,6 +152,12 @@ class nas_acl_action_t
 
         bool match_opaque_data_by_nexthop_id(ndi_obj_id_t ndi_obj_id);
 
+        // If action is related to port, check if it is bound to physical interface
+        bool is_eligible_for_install(npu_id_t npu_id) const noexcept;
+
+        // If action is releated to port, update the mapping from ifindex to NPU port
+        void update_port_mapping() const;
+
     private:
         void _set_opaque_data (const nas_acl_common_data_list_t& data_list);
         bool _ndi_copy_one_obj_id (ndi_acl_entry_action_t& ndi_action,
@@ -166,6 +172,9 @@ class nas_acl_action_t
         // Value for Redirect_port action
         nas::ifindex_list_t      _ifindex_list;
 
+        // List of NPU port for port-list action
+        mutable std::unordered_map<npu_id_t, std::vector<npu_port_t>> _npu_port_list;
+
         // Value for Counter Action
         nas_obj_id_t             _nas_oid = 0;
 
@@ -179,7 +188,10 @@ class nas_acl_action_t
             _nas2ndi_oid_tbl;
 
         // Values for all other actions are stored directly in NDI structure
-        ndi_acl_entry_action_t   _a_info;
+        mutable ndi_acl_entry_action_t   _a_info;
+
+        // Indicate mapping status if Action is port related
+        mutable bool _action_port_mapped = false;
 };
 
 inline const nas::ifindex_list_t&

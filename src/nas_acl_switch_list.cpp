@@ -28,7 +28,7 @@
 #include "nas_acl_switch.h"
 #include "nas_switch.h"
 
-static switch_list_t  _switches;
+static switch_list_t&  _switches = * new switch_list_t{};
 
 static nas_acl_switch& _save_switch (nas_acl_switch&& s)
 {

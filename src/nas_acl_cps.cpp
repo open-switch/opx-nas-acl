@@ -458,7 +458,7 @@ nas_acl_delete_nh_acl_entry_action (void               *context,
         NAS_ACL_LOG_ERR("No NH opaque data passed");
         return cps_api_ret_code_ERR;
     }
-    NAS_ACL_LOG_BRIEF(" Found NH opaque data %lld ", it->second);
+    NAS_ACL_LOG_BRIEF(" Found NH opaque data %lu ", it->second);
 
     try {
         nas_acl_delete_pbr_action_by_nh_obj(0, it->second);

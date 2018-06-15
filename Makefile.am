@@ -9,7 +9,7 @@ pyutils_SCRIPTS = scripts/lib/python/*.py
 lib_LTLIBRARIES=libopx_nas_acl.la
 COMMON_HARDEN_FLAGS=-fexceptions -fstack-protector-strong -fstack-protector-all -D_FORTIFY_SOURCE=2 -Wall -Wformat -Wformat-security -Werror
 C_HARDEN_FLAGS=-Wimplicit-function-declaration
-LD_HARDEN_FLAGS=-Wl,-z,defs -Wl,-z,now -Wl,-z,relo
+LD_HARDEN_FLAGS=-Wl,-z,defs -Wl,-z,now
 
 libopx_nas_acl_la_SOURCES=src/nas_acl_init.cpp src/nas_acl_table.cpp src/nas_acl_cps_counter.cpp src/nas_acl_counter.cpp src/nas_acl_action.cpp src/nas_acl_cps_stats.cpp src/nas_acl_cps_action_map.cpp src/nas_acl_entry.cpp src/nas_acl_cps_filter.cpp src/nas_acl_cps_utils.cpp src/nas_acl_filter.cpp src/nas_acl_switch.cpp src/nas_acl_cps_action.cpp src/nas_acl_cps_table.cpp src/nas_acl_cps_filter_map.cpp src/nas_acl_switch_list.cpp src/nas_acl_utl.cpp src/nas_acl_cps_entry.cpp src/nas_acl_cps.cpp src/nas_udf.cpp src/nas_udf_cps_group.cpp src/nas_udf_cps_match.cpp src/nas_udf_cps_udf.cpp src/nas_udf_group.cpp src/nas_udf_match.cpp \
 	src/nas_acl_cps_range.cpp \

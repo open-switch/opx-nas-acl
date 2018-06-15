@@ -106,7 +106,13 @@ class nas_acl_filter_t
 
         const std::vector<nas_obj_id_t>& range_id_list() const noexcept {return _range_oid_list;}
         bool is_range() const noexcept
-        {return filter_type() == BASE_ACL_MATCH_TYPE_RANGE_CHECK;}
+            {return filter_type() == BASE_ACL_MATCH_TYPE_RANGE_CHECK;}
+
+        // If filter is related to port, check if it is bound to physical interface
+        bool is_eligible_for_install(npu_id_t npu_id) const noexcept;
+
+        // If action is releated to port, update the mapping from ifindex to NPU port
+        void update_port_mapping() const;
 
     private:
         bool _ndi_copy_one_obj_id(ndi_acl_entry_filter_t* ndi_filter_p,
@@ -119,13 +125,19 @@ class nas_acl_filter_t
         //   - IN_PORT/OUT_PORT - ONLY if the port is a lag -
         //                        ifindex is used as nas_obj_id
         std::unordered_map<nas_obj_id_t, nas::ndi_obj_id_table_t>  _nas2ndi_oid_tbl;
-        ndi_acl_entry_filter_t   _f_info;
+        mutable ndi_acl_entry_filter_t   _f_info;
         nas::ifindex_list_t   _ifindex_list;
+
+        // List of NPU port for port-list filter
+        mutable std::unordered_map<npu_id_t, std::vector<npu_port_t>> _npu_port_list;
 
         const nas_acl_table* _table_p = nullptr;
 
         // Value for ACL Range filter
         std::vector<nas_obj_id_t> _range_oid_list;
+
+        // For port type filter, indicate if matching port is mapped
+        mutable bool _match_port_mapped = false;
 };
 
 inline const nas::ifindex_list_t&

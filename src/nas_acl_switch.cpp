@@ -22,9 +22,19 @@
 
 #include "nas_base_utils.h"
 #include "nas_acl_switch.h"
+#include "nas_acl_switch_list.h"
 #include "event_log.h"
+#include "hal_if_mapping.h"
+#include "std_mutex_lock.h"
 #include <string>
 #include <inttypes.h>
+
+static std_mutex_lock_create_static_init_rec(port_bind_mutex);
+
+auto nas_acl_intf_bind_mutex() noexcept ->decltype(port_bind_mutex)&
+{
+    return port_bind_mutex;
+}
 
 nas_acl_table& nas_acl_switch::get_table (nas_obj_id_t tbl_id)
 {
@@ -193,7 +203,7 @@ void nas_acl_switch::add_pbr_entry_to_cache(nas_obj_id_t tbl_id, nas_obj_id_t en
         pbr_entry.tbl_id = tbl_id;
         pbr_entry.entry_id = entry_id;
         _cached_pbr_entries.push_back(pbr_entry);
-        NAS_ACL_LOG_BRIEF("Adding PBR entry tbl_id %d, entry_id %d to cache",
+        NAS_ACL_LOG_BRIEF("Adding PBR entry tbl_id %lu, entry_id %lu to cache",
                    tbl_id, entry_id);
 
     }
@@ -208,7 +218,7 @@ void nas_acl_switch::del_pbr_entry_from_cache(nas_obj_id_t tbl_id, nas_obj_id_t 
         if( iter->tbl_id == tbl_id &&
             iter->entry_id == entry_id)
         {
-            NAS_ACL_LOG_BRIEF("Deleting PBR entry tbl_id %d, entry_id %d from cache",
+            NAS_ACL_LOG_BRIEF("Deleting PBR entry tbl_id %lu, entry_id %lu from cache",
                        tbl_id, entry_id);
             _cached_pbr_entries.erase( iter );
             break;
@@ -556,4 +566,169 @@ nas_acl_range& nas_acl_switch::save_acl_range(nas_acl_range&& acl_range) noexcep
 void nas_acl_switch::remove_acl_range(nas_obj_id_t range_id) noexcept
 {
     _range_objs.erase(range_id);
+}
+
+void nas_acl_switch::add_intf_acl_bind(hal_ifindex_t ifindex, const acl_rule_item_info_t& rule_item)
+{
+    interface_ctrl_t intf_ctrl;
+    memset(&intf_ctrl, 0, sizeof(interface_ctrl_t));
+    intf_ctrl.q_type = HAL_INTF_INFO_FROM_IF;
+    intf_ctrl.if_index = ifindex;
+    if (dn_hal_get_interface_info(&intf_ctrl) != STD_ERR_OK ||
+        intf_ctrl.int_type == nas_int_type_LAG) {
+        return;
+    }
+    _intf_acl_bind_map[ifindex].push_back(rule_item);
+}
+
+void nas_acl_switch::del_intf_acl_bind(hal_ifindex_t ifindex, const acl_rule_item_info_t& rule_item)
+{
+    interface_ctrl_t intf_ctrl;
+    memset(&intf_ctrl, 0, sizeof(interface_ctrl_t));
+    intf_ctrl.q_type = HAL_INTF_INFO_FROM_IF;
+    intf_ctrl.if_index = ifindex;
+    if (dn_hal_get_interface_info(&intf_ctrl) != STD_ERR_OK ||
+        intf_ctrl.int_type == nas_int_type_LAG) {
+        return;
+    }
+    if (_intf_acl_bind_map.find(ifindex) != _intf_acl_bind_map.end()) {
+        _intf_acl_bind_map[ifindex].remove_if([&rule_item](acl_rule_item_info_t& item)
+                {return item == rule_item;});
+    }
+}
+
+void nas_acl_switch::process_intf_acl_bind(hal_ifindex_t ifindex,
+                                           npu_id_t npu_id, npu_port_t npu_port)
+{
+    std_mutex_simple_lock_guard mutex(&port_bind_mutex);
+
+    NAS_ACL_LOG_BRIEF("Process ACL interface binding for ifindex %d",
+                      ifindex);
+    if (_intf_acl_bind_map.find(ifindex) == _intf_acl_bind_map.end()) {
+        return;
+    }
+    auto& item_list = _intf_acl_bind_map.at(ifindex);
+    for (auto& item: item_list) {
+        try {
+            auto& acl_entry = get_entry(item.table_id, item.entry_id);
+            if (item.is_match) {
+                NAS_ACL_LOG_BRIEF(" Update mapping of match type %d", item.match_type);
+                if (!acl_entry.filter_intf_mapping_update(item.match_type, ifindex, npu_id)) {
+                    NAS_ACL_LOG_ERR("Failed to update interface mapping on match %d",
+                                    item.match_type);
+                    return;
+                }
+            } else {
+                NAS_ACL_LOG_BRIEF(" Update mapping of action type %d", item.action_type);
+                if (!acl_entry.action_intf_mapping_update(item.action_type, ifindex, npu_id)) {
+                    NAS_ACL_LOG_ERR("Failed to update interface mapping on action %d",
+                                    item.action_type);
+                    return;
+                }
+            }
+        } catch (nas::base_exception& ex) {
+            NAS_ACL_LOG_ERR("Failed to get entry: %s", ex.err_msg.c_str());
+            continue;
+        }
+    }
+}
+
+void nas_acl_switch::update_intf_match_bind(const nas_acl_entry& entry,
+                                            const nas_acl_filter_t* old_match,
+                                            const nas_acl_filter_t* new_match) noexcept
+{
+    if (old_match == nullptr && new_match == nullptr) {
+        return;
+    }
+
+    auto f_type = old_match != nullptr ? old_match->filter_type() :
+                                         new_match->filter_type();
+
+    nas::ifindex_list_t add_ifs;
+    nas::ifindex_list_t del_ifs;
+
+    compare_ifindex_list(
+            old_match == nullptr ? nas::ifindex_list_t{} : old_match->get_filter_if_list(),
+            new_match == nullptr ? nas::ifindex_list_t{} : new_match->get_filter_if_list(),
+            del_ifs, add_ifs);
+
+    NAS_ACL_LOG_DETAIL("Update interface ACL bind for match type %s",
+                       nas_acl_filter_t::type_name(f_type));
+
+    std_mutex_simple_lock_guard mutex(&port_bind_mutex);
+
+    for (auto ifidx: del_ifs) {
+        NAS_ACL_LOG_DETAIL(" Interface to be deleted: ifindex=%d", ifidx);
+        acl_rule_item_info_t item{entry.get_table().table_id(), entry.entry_id(), true};
+        item.match_type = f_type;
+        del_intf_acl_bind(ifidx, item);
+    }
+    for (auto ifidx: add_ifs) {
+        NAS_ACL_LOG_DETAIL(" Interface to be added: ifindex=%d", ifidx);
+        acl_rule_item_info_t item{entry.get_table().table_id(), entry.entry_id(), true};
+        item.match_type = f_type;
+        add_intf_acl_bind(ifidx, item);
+    }
+}
+
+void nas_acl_switch::update_intf_action_bind(const nas_acl_entry& entry,
+                                             const nas_acl_action_t* old_action,
+                                             const nas_acl_action_t* new_action) noexcept
+{
+    if (old_action == nullptr && new_action == nullptr) {
+        return;
+    }
+
+    auto a_type = old_action != nullptr ? old_action->action_type() :
+                                          new_action->action_type();
+
+    nas::ifindex_list_t add_ifs;
+    nas::ifindex_list_t del_ifs;
+
+    compare_ifindex_list(
+            old_action == nullptr ? nas::ifindex_list_t{} : old_action->get_action_if_list(),
+            new_action == nullptr ? nas::ifindex_list_t{} : new_action->get_action_if_list(),
+            del_ifs, add_ifs);
+
+    NAS_ACL_LOG_DETAIL("Update interface ACL bind for action type %s",
+                        nas_acl_action_t::type_name(a_type));
+
+    std_mutex_simple_lock_guard mutex(&port_bind_mutex);
+
+    for (auto ifidx: del_ifs) {
+        NAS_ACL_LOG_DETAIL(" Interface to be deleted: ifindex=%d", ifidx);
+        acl_rule_item_info_t item{entry.get_table().table_id(), entry.entry_id(), false};
+        item.action_type = a_type;
+        del_intf_acl_bind(ifidx, item);
+    }
+    for (auto ifidx: add_ifs) {
+        NAS_ACL_LOG_DETAIL(" Interface to be added: ifindex=%d", ifidx);
+        acl_rule_item_info_t item{entry.get_table().table_id(), entry.entry_id(), false};
+        item.action_type = a_type;
+        add_intf_acl_bind(ifidx, item);
+    }
+}
+
+void nas_acl_switch::dump_rule_intf_bind(void) const noexcept
+{
+    NAS_ACL_LOG_DUMP("--------------------------------------");
+    NAS_ACL_LOG_DUMP("Interface Binding Dump for switch %d", id());
+    NAS_ACL_LOG_DUMP("--------------------------------------");
+    for (auto& bind_pair: _intf_acl_bind_map) {
+        for (auto& item: bind_pair.second) {
+            NAS_ACL_LOG_DUMP("%s ifindex %d type %s table %d entry %d",
+                             (item.is_match ? "Match" : "Action"),
+                             bind_pair.first,
+                             (item.is_match ? nas_acl_filter_type_name(item.match_type) :
+                                              nas_acl_action_type_name(item.action_type)),
+                             item.table_id, item.entry_id);
+        }
+    }
+}
+
+void dump_all_intf_bind(void)
+{
+    for (const auto& switch_pair: nas_acl_get_switch_list()) {
+        switch_pair.second.dump_rule_intf_bind();
+    }
 }

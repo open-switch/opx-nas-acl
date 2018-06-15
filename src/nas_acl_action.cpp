@@ -284,6 +284,51 @@ void nas_acl_action_t::get_opaque_data_nexthop_val (nas_acl_common_data_list_t& 
     }
 }
 
+void nas_acl_action_t::update_port_mapping() const
+{
+    interface_ctrl_t  intf_ctrl {};
+    if (_a_info.values_type == NDI_ACL_ACTION_PORT) {
+        if (_ifindex_list.size() != 1) {
+            NAS_ACL_LOG_ERR("Action should contain only 1 interface");
+            return;
+        }
+        auto ifindex = _ifindex_list[0];
+        if (nas_acl_utl_is_ifidx_type_lag(ifindex)) {
+            return;
+        }
+        memset(&intf_ctrl, 0, sizeof(intf_ctrl));
+        nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
+
+        if (intf_ctrl.port_mapped) {
+            _action_port_mapped = true;
+            _a_info.values.ndi_port.npu_id = intf_ctrl.npu_id;
+            _a_info.values.ndi_port.npu_port = intf_ctrl.port_id;
+        } else {
+            _action_port_mapped = false;
+        }
+    } else if (_a_info.values_type == NDI_ACL_ACTION_PORTLIST) {
+        _npu_port_list.clear();
+        for (auto ifindex: _ifindex_list) {
+            if (nas_acl_utl_is_ifidx_type_lag(ifindex)) {
+                continue;
+            }
+            memset(&intf_ctrl, 0, sizeof(intf_ctrl));
+            nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
+
+            if (!intf_ctrl.port_mapped) {
+                continue;
+            }
+            if (_npu_port_list.find(intf_ctrl.npu_id) == _npu_port_list.end()) {
+                _npu_port_list[intf_ctrl.npu_id] = {intf_ctrl.port_id};
+            } else {
+                _npu_port_list[intf_ctrl.npu_id].push_back(intf_ctrl.port_id);
+            }
+        }
+    } else {
+        NAS_ACL_LOG_ERR("Action is not port type");
+    }
+}
+
 void nas_acl_action_t::set_action_ifindex (const nas_acl_common_data_list_t& data_list)
 {
     auto ifindex = data_list.at(0).ifindex;
@@ -308,6 +353,7 @@ void nas_acl_action_t::set_action_ifindex (const nas_acl_common_data_list_t& dat
         _a_info.values_type    = NDI_ACL_ACTION_OBJ_ID;
 
     } else {
+        _a_info.values_type = NDI_ACL_ACTION_PORT;
         // Convert to NPU and port
         interface_ctrl_t  intf_ctrl {};
         nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
@@ -316,6 +362,8 @@ void nas_acl_action_t::set_action_ifindex (const nas_acl_common_data_list_t& dat
 
         _a_info.values.ndi_port.npu_id   = intf_ctrl.npu_id;
         _a_info.values.ndi_port.npu_port = intf_ctrl.port_id;
+
+        update_port_mapping();
     }
 }
 
@@ -342,6 +390,8 @@ void nas_acl_action_t::set_action_ifindex_list (const nas_acl_common_data_list_t
             _ifindex_list.push_back (port);
         }
     }
+
+    update_port_mapping();
 }
 
 void nas_acl_action_t::get_action_ifindex_list (nas_acl_common_data_list_t& val_list) const
@@ -488,30 +538,16 @@ bool nas_acl_action_t::copy_action_ndi (ndi_acl_action_list_t& ndi_alist,
         // Assert to ensure that we are not overwriting existing portlist
         STD_ASSERT (_a_info.values.ndi_portlist.port_list == NULL);
 
-        // Build the list of NPU specific ports
-        std::vector<ndi_port_t> ndi_plist;
-
-        for (auto ifindex: _ifindex_list) {
-            // Convert to NPU and port
-            interface_ctrl_t  intf_ctrl {};
-            nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
-            if (intf_ctrl.npu_id != npu_id) {
-                continue;
-            }
-            ndi_plist.push_back (ndi_port_t {intf_ctrl.npu_id, intf_ctrl.port_id});
-        }
-
-        if (ndi_plist.empty()) {
-            NAS_ACL_LOG_DETAIL("%s: port list is empty, ignore this action", name());
-            ndi_alist.pop_back();
-            return true;
-        }
-
         auto& ndi_action = ndi_alist.back();
-        ndi_action.values.ndi_portlist.port_count = ndi_plist.size();
-        ndi_port_t* plist =  mem_trakr.alloc<ndi_port_t> (ndi_plist.size());
+        ndi_action.values.ndi_portlist.port_count = _npu_port_list[npu_id].size();
+        ndi_port_t* plist =  mem_trakr.alloc<ndi_port_t> (_npu_port_list[npu_id].size());
         ndi_action.values.ndi_portlist.port_list = plist;
-        memcpy (plist, ndi_plist.data(), sizeof (ndi_port_t) * ndi_plist.size());
+        int idx = 0;
+        for (auto port_id: _npu_port_list[npu_id]) {
+            plist[idx].npu_id = npu_id;
+            plist[idx].npu_port = port_id;
+            idx ++;
+        }
     }
 
     return true;
@@ -583,7 +619,7 @@ void nas_acl_action_t::dbg_dump () const
             for (auto ifindex: _ifindex_list) {
                 NAS_ACL_LOG_DUMP ("%d, ", ifindex);
             }
-            NAS_ACL_LOG_DUMP ("");
+            NAS_ACL_LOG_DUMP ("%s", "");
             break;
 
         case NDI_ACL_ACTION_U32:
@@ -608,7 +644,7 @@ void nas_acl_action_t::dbg_dump () const
                 for (auto ifindex: _ifindex_list) {
                     NAS_ACL_LOG_DUMP ("%d, ", ifindex);
                 }
-                NAS_ACL_LOG_DUMP ("");
+                NAS_ACL_LOG_DUMP ("%s", "");
             } else if (action_type() == BASE_ACL_ACTION_TYPE_REDIRECT_IP_NEXTHOP) {
                 for (auto nh2ndi_oid_pair: _nas2ndi_oid_tbl) {
                     char buff[HAL_INET6_TEXT_LEN + 1];
@@ -634,7 +670,7 @@ void nas_acl_action_t::dbg_dump () const
                             npu2ndi_oid_pair.first, npu2ndi_oid_pair.second );
                 }
             }
-            NAS_ACL_LOG_DUMP ("");
+            NAS_ACL_LOG_DUMP ("%s", "");
             break;
 
         case NDI_ACL_ACTION_MAC_ADDR:
@@ -677,4 +713,20 @@ bool nas_acl_action_t::match_opaque_data_by_nexthop_id(ndi_obj_id_t ndi_obj_id)
     }
 
     return false;
+}
+
+bool nas_acl_action_t::is_eligible_for_install(npu_id_t npu_id) const noexcept
+{
+    if (_a_info.values_type == NDI_ACL_ACTION_PORT) {
+        if (_a_info.values.ndi_port.npu_id != npu_id || !_action_port_mapped) {
+            return false;
+        }
+    } else if (_a_info.values_type == NDI_ACL_ACTION_PORTLIST) {
+        if (_npu_port_list.find(npu_id) == _npu_port_list.end() ||
+            _npu_port_list[npu_id].empty()) {
+            return false;
+        }
+    }
+
+    return true;
 }

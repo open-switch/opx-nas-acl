@@ -215,6 +215,15 @@ t_std_error ndi_acl_entry_disable_action (npu_id_t npu_id,
     return STD_ERR_OK;
 }
 
+t_std_error ndi_acl_entry_disable_counter_action (npu_id_t npu_id,
+                                          ndi_obj_id_t ndi_entry_id,
+                                          ndi_obj_id_t ndi_counter_id)
+{
+    ut_printf ("%s: npu %d, entry id %ld counter_id %ld\n", __FUNCTION__, npu_id, ndi_entry_id,
+               ndi_counter_id);
+    return STD_ERR_OK;
+}
+
 t_std_error ndi_acl_counter_create (npu_id_t npu_id,
                                     const ndi_acl_counter_t* ndi_counter_p,
                                     ndi_obj_id_t* ndi_counter_id_p)

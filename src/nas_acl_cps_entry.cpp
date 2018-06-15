@@ -745,6 +745,8 @@ static t_std_error nas_acl_entry_create (cps_api_object_t obj,
                                          cps_api_object_t prev,
                                          bool             is_rollbk_op) noexcept
 {
+    std_mutex_simple_lock_guard mutex(&nas_acl_intf_bind_mutex());
+
     try {
         auto op_key = _cps_op_key_extract (obj, true);
 
@@ -829,6 +831,8 @@ static t_std_error nas_acl_entry_modify (cps_api_object_t obj,
                                          cps_api_object_t prev,
                                          bool             is_rollbk_op) noexcept
 {
+    std_mutex_simple_lock_guard mutex(&nas_acl_intf_bind_mutex());
+
     try {
         auto op_key = _cps_op_key_extract (obj, false);
 
@@ -891,6 +895,8 @@ static t_std_error nas_acl_entry_delete (cps_api_object_t obj,
                                          cps_api_object_t prev,
                                          bool             is_rollbk_op) noexcept
 {
+    std_mutex_simple_lock_guard mutex(&nas_acl_intf_bind_mutex());
+
     try {
         auto op_key = _cps_op_key_extract (obj, false);
 
