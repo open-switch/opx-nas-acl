@@ -22,18 +22,20 @@
 
 #include "dell-base-acl.h"
 #include "nas_base_utils.h"
+#include "nas_if_utils.h"
 #include "nas_acl_log.h"
 #include "nas_acl_entry.h"
 #include "nas_acl_table.h"
 #include "nas_acl_switch.h"
 #include "nas_ndi_acl.h"
 #include "nas_acl_log.h"
+#include "nas_acl_utl.h"
 #include <inttypes.h>
 
 static void _utl_push_disable_action_to_npu (nas_acl_entry& acl_entry,
                                              BASE_ACL_ACTION_TYPE_t a_type,
-                                             npu_id_t  npu_id,
-                                             bool remove_counter=false);
+                                             nas_obj_id_t counter_id,
+                                             npu_id_t  npu_id);
 
 nas_acl_entry::nas_acl_entry (const nas_acl_table* table_p)
     :nas::base_obj_t (&(table_p->get_switch())), _entry_name(""),
@@ -387,7 +389,7 @@ bool nas_acl_entry::_copy_all_filters_ndi (ndi_acl_entry_t &ndi_acl_entry,
 {
     int i = 0;
     for (const_filter_iter_t itr = _flist.begin();
-         itr != _flist.end(); ++itr,++i) {
+         itr != _flist.end(); ++itr) {
 
         auto& f = nas_acl_entry::get_filter_from_itr (itr);
         if (!f.copy_filter_ndi (&ndi_acl_entry.filter_list[i],
@@ -400,13 +402,16 @@ bool nas_acl_entry::_copy_all_filters_ndi (ndi_acl_entry_t &ndi_acl_entry,
                                     mem_trakr);
             _update_range_ref_cnt(*this, true);
         }
+
+        i ++;
     }
+    ndi_acl_entry.filter_count = i;
     return true;
 }
 
 static void _copy_ndi_counter_id (const nas_acl_entry& entry,
                                   ndi_acl_entry_action_t& ndi_action,
-                                  npu_id_t  npu_id) noexcept
+                                  npu_id_t  npu_id)
 {
     auto counter_p = entry.get_counter();
     ndi_action.values.ndi_obj_ref = counter_p->ndi_obj_id (npu_id);
@@ -427,10 +432,13 @@ ndi_acl_action_list_t nas_acl_entry::_copy_all_actions_ndi (npu_id_t npu_id,
             found_trap_id_action = true;
             continue;
         }
-        action.copy_action_ndi (ndi_alist, npu_id, mem_trakr);
 
-        if (action.is_counter()) {
-            _copy_ndi_counter_id (*this, ndi_alist.back(), npu_id);
+        if (action.is_eligible_for_install(npu_id)) {
+            action.copy_action_ndi (ndi_alist, npu_id, mem_trakr);
+
+            if (action.is_counter()) {
+                _copy_ndi_counter_id (*this, ndi_alist.back(), npu_id);
+            }
         }
     }
 
@@ -442,51 +450,116 @@ ndi_acl_action_list_t nas_acl_entry::_copy_all_actions_ndi (npu_id_t npu_id,
     return ndi_alist;
 }
 
-bool nas_acl_entry::push_create_obj_to_npu (npu_id_t npu_id,
-                                            void* ndi_obj)
+static inline bool is_intf_related_filter(BASE_ACL_MATCH_TYPE_t f_type)
 {
-    t_std_error rc = STD_ERR_OK;
-    nas::mem_alloc_helper_t mem_trakr;
-    ndi_acl_entry_t ndi_acl_entry = {};
+    return (f_type == BASE_ACL_MATCH_TYPE_IN_PORT ||
+            f_type == BASE_ACL_MATCH_TYPE_OUT_PORT ||
+            f_type == BASE_ACL_MATCH_TYPE_SRC_PORT ||
+            f_type == BASE_ACL_MATCH_TYPE_IN_PORTS ||
+            f_type == BASE_ACL_MATCH_TYPE_OUT_PORTS ||
+            f_type == BASE_ACL_MATCH_TYPE_IN_INTF ||
+            f_type == BASE_ACL_MATCH_TYPE_OUT_INTF ||
+            f_type == BASE_ACL_MATCH_TYPE_SRC_INTF ||
+            f_type == BASE_ACL_MATCH_TYPE_IN_INTFS ||
+            f_type == BASE_ACL_MATCH_TYPE_OUT_INTFS);
+}
 
-    ///// Populate the NDI ACL Entry structure
-    //
-    ndi_acl_entry.table_id = get_table().get_ndi_obj_id(npu_id);
-    ndi_acl_entry.priority = priority();
+static inline bool is_intf_related_action(BASE_ACL_ACTION_TYPE_t a_type)
+{
+    return (a_type == BASE_ACL_ACTION_TYPE_REDIRECT_PORT ||
+            a_type == BASE_ACL_ACTION_TYPE_REDIRECT_PORT_LIST ||
+            a_type == BASE_ACL_ACTION_TYPE_REDIRECT_INTF ||
+            a_type == BASE_ACL_ACTION_TYPE_REDIRECT_INTF_LIST ||
+            a_type == BASE_ACL_ACTION_TYPE_EGRESS_MASK ||
+            a_type == BASE_ACL_ACTION_TYPE_EGRESS_INTF_MASK);
+}
 
-    /////// Populate the filters
-    ndi_acl_entry.filter_count = _flist.size();
-    ndi_acl_entry.filter_list = mem_trakr.alloc<ndi_acl_entry_filter_t> (_flist.size());
+bool nas_acl_entry::push_create_obj_to_npu_ext (npu_id_t npu_id,
+                                                void* ndi_obj, bool upd_intf_bind)
+{
+    if (is_installed_to_npu(npu_id)) {
+        // already installed to NPU
+        NAS_ACL_LOG_BRIEF ("Switch %d Table %ld: Entry %ld: was already installed in NPU %d",
+                           get_switch().id(), get_table().table_id(),
+                           entry_id(), npu_id);
+        return true;
+    }
+    bool install_entry = true;
+    for (auto& flt_pair: _flist) {
+        if (!flt_pair.second.is_eligible_for_install(npu_id)) {
+            install_entry = false;
+            NAS_ACL_LOG_DETAIL("Entry could not be installed to NPU due to match type %d",
+                               flt_pair.first.match_type);
+            break;
+        }
+    }
+    if (install_entry) {
+        t_std_error rc = STD_ERR_OK;
+        nas::mem_alloc_helper_t mem_trakr;
+        ndi_acl_entry_t ndi_acl_entry = {};
 
-    if (!_copy_all_filters_ndi (ndi_acl_entry, npu_id, mem_trakr)) {
-        return false;
+        ///// Populate the NDI ACL Entry structure
+        //
+        ndi_acl_entry.table_id = get_table().get_ndi_obj_id(npu_id);
+        ndi_acl_entry.priority = priority();
+
+        /////// Populate the filters
+        ndi_acl_entry.filter_count = _flist.size();
+        ndi_acl_entry.filter_list = mem_trakr.alloc<ndi_acl_entry_filter_t> (_flist.size());
+
+        if (!_copy_all_filters_ndi (ndi_acl_entry, npu_id, mem_trakr)) {
+            return false;
+        }
+
+        ///// Populate the actions
+        auto ndi_alist = _copy_all_actions_ndi (npu_id, mem_trakr);
+
+        ndi_acl_entry.action_count = ndi_alist.size();
+        ndi_acl_entry.action_list = ndi_alist.data();
+
+        ndi_obj_id_t ndi_entry_id;
+
+        if ((rc = ndi_acl_entry_create (npu_id, &ndi_acl_entry,
+                &ndi_entry_id)) != STD_ERR_OK) {
+            throw nas::base_exception {rc, __PRETTY_FUNCTION__,
+                std::string {"NDI ACL Entry Create failed for NPU "} +
+                std::to_string (npu_id)};
+        }
+
+        ndi_entry_ids[npu_id] = ndi_entry_id;
+
+        NAS_ACL_LOG_DETAIL ("Switch %d Table %ld: Created ACL Entry in NPU %d "
+                "NDI-ID 0x%" PRIx64,
+                switch_id(), table_id(), npu_id, ndi_entry_id);
     }
 
-    ///// Populate the actions
-    auto ndi_alist = _copy_all_actions_ndi (npu_id, mem_trakr);
+    if (upd_intf_bind) {
+        // Update interface binding map
+        for (auto itor: _flist) {
+            auto f_type = itor.second.filter_type();
+            if (is_intf_related_filter(f_type)) {
+                _table_p->get_switch().update_intf_match_bind(*this, nullptr, &itor.second);
+            }
+        }
 
-    ndi_acl_entry.action_count = ndi_alist.size();
-    ndi_acl_entry.action_list = ndi_alist.data();
-
-    ndi_obj_id_t ndi_entry_id;
-
-    if ((rc = ndi_acl_entry_create (npu_id, &ndi_acl_entry,
-            &ndi_entry_id)) != STD_ERR_OK) {
-        throw nas::base_exception {rc, __PRETTY_FUNCTION__,
-            std::string {"NDI ACL Entry Create failed for NPU "} +
-            std::to_string (npu_id)};
+        for (auto itor: _alist) {
+            auto a_type = itor.second.action_type();
+            if (is_intf_related_action(a_type)) {
+                _table_p->get_switch().update_intf_action_bind(*this, nullptr, &itor.second);
+            }
+        }
     }
-
-    ndi_entry_ids[npu_id] = ndi_entry_id;
-
-    NAS_ACL_LOG_DETAIL ("Switch %d Table %ld: Created ACL Entry in NPU %d "
-            "NDI-ID 0x%" PRIx64,
-            switch_id(), table_id(), npu_id, ndi_entry_id);
 
     return true;
 }
 
-bool nas_acl_entry::push_delete_obj_to_npu (npu_id_t npu_id)
+bool nas_acl_entry::push_create_obj_to_npu (npu_id_t npu_id,
+                                            void* ndi_obj)
+{
+    return push_create_obj_to_npu_ext(npu_id, ndi_obj, true);
+}
+
+bool nas_acl_entry::push_delete_obj_to_npu_ext (npu_id_t npu_id, bool upd_intf_bind)
 {
     t_std_error rc = STD_ERR_OK;
     auto it_ndi_eid = ndi_entry_ids.find (npu_id);
@@ -509,6 +582,23 @@ bool nas_acl_entry::push_delete_obj_to_npu (npu_id_t npu_id)
     if (is_range_enabled()) {
         _update_range_ref_cnt(*this, false);
     }
+
+    if (upd_intf_bind) {
+        for (auto itor: _flist) {
+            auto f_type = itor.second.filter_type();
+            if (is_intf_related_filter(f_type)) {
+                _table_p->get_switch().update_intf_match_bind(*this, &itor.second, nullptr);
+            }
+        }
+
+        for (auto itor: _alist) {
+            auto a_type = itor.second.action_type();
+            if (is_intf_related_action(a_type)) {
+                _table_p->get_switch().update_intf_action_bind(*this, &itor.second, nullptr);
+            }
+        }
+    }
+
     NAS_ACL_LOG_DETAIL ("Switch %d Table %ld: Deleted ACL Entry %ld in NPU %d "
                         "NDI-ID 0x%" PRIx64,
                         switch_id(), table_id(), entry_id(), npu_id,
@@ -517,6 +607,11 @@ bool nas_acl_entry::push_delete_obj_to_npu (npu_id_t npu_id)
     ndi_entry_ids.erase (npu_id);
 
     return true;
+}
+
+bool nas_acl_entry::push_delete_obj_to_npu (npu_id_t npu_id)
+{
+    return push_delete_obj_to_npu_ext(npu_id, true);
 }
 
 bool nas_acl_entry::is_leaf_attr (nas_attr_id_t attr_id)
@@ -651,6 +746,37 @@ static void _utl_push_filter_to_npu (nas_acl_entry& acl_entry,
                         f_add.name(), npu_id);
 }
 
+void nas_acl_entry::update_filter_to_npu(npu_id_t npu_id, const nas_acl_filter_t& filter,
+                                         bool del_filter)
+{
+    if (del_filter) {
+        if (is_installed_to_npu(npu_id)) {
+            NAS_ACL_LOG_BRIEF("Disable filter %s from entry %d", filter.name(),
+                              entry_id());
+            _utl_push_disable_filter_to_npu (*this, filter.filter_type(), npu_id);
+        }
+        return;
+    }
+
+    if (filter.is_eligible_for_install(npu_id)) {
+        if (is_installed_to_npu(npu_id)) {
+             NAS_ACL_LOG_BRIEF("Entry %d was installed to NPU, update filter %s",
+                               entry_id(), filter.name());
+             _utl_push_filter_to_npu(*this, filter, npu_id);
+        } else {
+            NAS_ACL_LOG_BRIEF("Entry %d was not installed to NPU, install entry with filter %s",
+                              entry_id(), filter.name());
+            push_create_obj_to_npu_ext(npu_id, nullptr, false);
+        }
+    } else {
+        if (is_installed_to_npu(npu_id)) {
+            NAS_ACL_LOG_BRIEF("Remove entry %d because filter %s with virtual interface added",
+                              entry_id(), filter.name());
+            push_delete_obj_to_npu_ext(npu_id, false);
+        }
+    }
+}
+
 static void _utl_modify_flist_npulist_ndi (nas_acl_entry&   entry_new,
                                            nas::base_obj_t&   obj_old,
                                            nas::npu_set_t  npu_list,
@@ -672,9 +798,11 @@ static void _utl_modify_flist_npulist_ndi (nas_acl_entry&   entry_new,
             const nas_acl_filter_t& f_del = nas_acl_entry::get_filter_from_itr (itr_del);
 
             try {
-                _utl_push_disable_filter_to_npu (entry_new, f_del.filter_type(),
-                                                 npu_id);
-
+                entry_new.update_filter_to_npu(npu_id, f_del, true);
+                if (is_intf_related_filter(f_del.filter_type())) {
+                    entry_new.get_table().get_switch().update_intf_match_bind(entry_new,
+                            &f_del, nullptr);
+                }
             } catch (nas::base_exception& e) {
                 if (rolling_back) {
                     // Error when rolling back - Log and continue with next filter
@@ -703,7 +831,18 @@ static void _utl_modify_flist_npulist_ndi (nas_acl_entry&   entry_new,
             }
 
             try {
-                _utl_push_filter_to_npu (entry_new, f_add, npu_id);
+                entry_new.update_filter_to_npu(npu_id, f_add, false);
+
+                if (is_intf_related_filter(f_add.filter_type())) {
+                    auto flt_list = entry_old.get_filter_list();
+                    auto itor = flt_list.find({f_add.filter_type(), 0});
+                    const nas_acl_filter_t* p_old_flt = nullptr;
+                    if (itor != flt_list.end()) {
+                        p_old_flt = &itor->second;
+                    }
+                    entry_new.get_table().get_switch().update_intf_match_bind(entry_new,
+                            p_old_flt, &f_add);
+                }
 
             } catch (nas::base_exception& e) {
                 if (rolling_back) {
@@ -763,17 +902,30 @@ static void _utl_alist_compare (const nas_acl_entry::action_list_t& lhs_alist,
 // Handle deleted action in entry change request
 static void _utl_push_disable_action_to_npu (nas_acl_entry& acl_entry,
                                              BASE_ACL_ACTION_TYPE_t a_type,
-                                             npu_id_t  npu_id,
-                                             bool remove_counter)
+                                             nas_obj_id_t counter_id,
+                                             npu_id_t  npu_id)
 {
     t_std_error rc;
-    if ((rc = ndi_acl_entry_disable_action (npu_id,
-                                            acl_entry.ndi_entry_ids.at (npu_id),
-                                            a_type)) != STD_ERR_OK) {
-        throw nas::base_exception {rc, __PRETTY_FUNCTION__,
-            std::string {"NDI Action Disable failed for "} +
-            nas_acl_action_t::type_name (a_type) +
-            " for NPU " + std::to_string (npu_id)};
+    if (a_type == BASE_ACL_ACTION_TYPE_SET_COUNTER) {
+        auto& counter = acl_entry.get_table().get_switch().get_counter(
+                            acl_entry.table_id(), counter_id);
+        auto ndi_counter_id = counter.ndi_obj_id(npu_id);
+        if ((rc = ndi_acl_entry_disable_counter_action (npu_id,
+                                                acl_entry.ndi_entry_ids.at (npu_id),
+                                                ndi_counter_id)) != STD_ERR_OK) {
+            throw nas::base_exception {rc, __PRETTY_FUNCTION__,
+                std::string {"NDI Set Counter Action Disable failed for NPU "} +
+                std::to_string (npu_id)};
+        }
+    } else {
+        if ((rc = ndi_acl_entry_disable_action (npu_id,
+                                                acl_entry.ndi_entry_ids.at (npu_id),
+                                                a_type)) != STD_ERR_OK) {
+            throw nas::base_exception {rc, __PRETTY_FUNCTION__,
+                std::string {"NDI Action Disable failed for "} +
+                nas_acl_action_t::type_name (a_type) +
+                " for NPU " + std::to_string (npu_id)};
+        }
     }
 
     NAS_ACL_LOG_DETAIL ("ACL Entry NDI: Disabled Action %s in NPU %d",
@@ -814,6 +966,31 @@ static void _utl_push_action_to_npu (nas_acl_entry& acl_entry,
                         a_add.name(), npu_id);
 }
 
+void nas_acl_entry::update_action_to_npu(npu_id_t npu_id, const nas_acl_action_t& action,
+                                         bool del_action)
+{
+    if (del_action) {
+        if (action.is_eligible_for_install(npu_id)) {
+             NAS_ACL_LOG_BRIEF("Disable action %s from entry %d", action.name(),
+                               entry_id());
+             _utl_push_disable_action_to_npu (*this, action.action_type(),
+                                              action.counter_id(), npu_id);
+        }
+        return;
+    }
+
+    if (action.is_eligible_for_install(npu_id)) {
+        NAS_ACL_LOG_DETAIL("Action %s of entry %d is eligible to be installed to NPU, enable it",
+                           action.name(), entry_id());
+        _utl_push_action_to_npu (*this, action, npu_id);
+    } else {
+        NAS_ACL_LOG_DETAIL("Action %s of entry %d is not eligible to be installed to NPU, disable it",
+                            action.name(), entry_id());
+        _utl_push_disable_action_to_npu (*this, action.action_type(),
+                                         action.counter_id(), npu_id);
+    }
+}
+
 // Identify change in action list and push change to each NPU for the ACL entry
 static void _utl_modify_alist_npulist_ndi (nas_acl_entry&   entry_new,
                                            nas::base_obj_t&   obj_old,
@@ -838,8 +1015,11 @@ static void _utl_modify_alist_npulist_ndi (nas_acl_entry&   entry_new,
                                 nas_acl_action_t::type_name(a_del.action_type()),
                                 npu_id);
             try {
-                _utl_push_disable_action_to_npu (entry_new, a_del.action_type(),
-                                                 npu_id);
+                entry_new.update_action_to_npu(npu_id, a_del, true);
+                if (is_intf_related_action(a_del.action_type())) {
+                    entry_new.get_table().get_switch().update_intf_action_bind(entry_new,
+                            &a_del, nullptr);
+                }
             } catch (nas::base_exception& e) {
                 if (rolling_back) {
                     // Error when rolling back - Log and continue with next action
@@ -867,8 +1047,17 @@ static void _utl_modify_alist_npulist_ndi (nas_acl_entry&   entry_new,
                                 nas_acl_action_t::type_name(a_add.action_type()),
                                 npu_id);
             try {
-                _utl_push_action_to_npu (entry_new, a_add, npu_id);
-
+                entry_new.update_action_to_npu(npu_id, a_add, false);
+                if (is_intf_related_action(a_add.action_type())) {
+                    auto act_list = entry_old.get_action_list();
+                    auto itor = act_list.find(a_add.action_type());
+                    const nas_acl_action_t* p_old_act = nullptr;
+                    if (itor != act_list.end()) {
+                        p_old_act = &itor->second;
+                    }
+                    entry_new.get_table().get_switch().update_intf_action_bind(entry_new,
+                            p_old_act, &a_add);
+                }
             } catch (nas::base_exception& e) {
                 if (rolling_back) {
                     // Error when rolling back - Log and continue with next action
@@ -938,8 +1127,9 @@ void nas_acl_entry::rollback_create_attr_in_npu (const nas::attr_list_t&
             try {
                 auto a_type = static_cast <BASE_ACL_ACTION_TYPE_t>
                     (attr_hierarchy[1]);
+                auto counter_id = static_cast<ndi_obj_id_t>(attr_hierarchy[2]);
 
-                _utl_push_disable_action_to_npu (*this, a_type, npu_id);
+                _utl_push_disable_action_to_npu (*this, a_type, counter_id, npu_id);
 
             } catch (nas::base_exception& e) {
                 NAS_ACL_LOG_ERR ("Rollback failed: NPU %d: %s ErrCode: %d \n",
@@ -1019,12 +1209,12 @@ void nas_acl_entry::dbg_dump () const
     for (auto npu_id: npu_list()) {
         NAS_ACL_LOG_DUMP ("%d, ", npu_id);
     }
-    NAS_ACL_LOG_DUMP ("");
+    NAS_ACL_LOG_DUMP ("%s", "");
     NAS_ACL_LOG_DUMP ("NDI Entry IDs: ");
     for (auto ndi_entry_map: ndi_entry_ids) {
         NAS_ACL_LOG_DUMP ("(NPU %d, %ld) ", ndi_entry_map.first, ndi_entry_map.second );
     }
-    NAS_ACL_LOG_DUMP ("");
+    NAS_ACL_LOG_DUMP ("%s", "");
     NAS_ACL_LOG_DUMP ("Num Filters: %ld", get_filter_list().size());
     for (auto& f_kv: get_filter_list()) {
         const nas_acl_filter_t& filter = f_kv.second;
@@ -1037,4 +1227,40 @@ void nas_acl_entry::dbg_dump () const
         NAS_ACL_LOG_DUMP ("  Action %s", action.name());
         action.dbg_dump ();
     }
+}
+
+bool nas_acl_entry::filter_intf_mapping_update(BASE_ACL_MATCH_TYPE_t f_type,
+                                               hal_ifindex_t ifindex, npu_id_t npu_id) noexcept
+{
+    try {
+        const nas_acl_filter_t& filter = get_filter(f_type, 0);
+        filter.update_port_mapping();
+        update_filter_to_npu(npu_id, filter, false);
+    } catch (nas::base_exception& e) {
+        NAS_ACL_LOG_ERR("Err_code: 0x%x, fn: %s (), %s", e.err_code,
+                        e.err_fn.c_str(), e.err_msg.c_str());
+        return false;
+    } catch (std::exception& e) {
+        NAS_ACL_LOG_ERR("Unknown Err: %s", e.what());
+        return false;
+    }
+    return true;
+}
+
+bool nas_acl_entry::action_intf_mapping_update(BASE_ACL_ACTION_TYPE_t a_type,
+                                               hal_ifindex_t ifindex, npu_id_t npu_id) noexcept
+{
+    try {
+        const nas_acl_action_t& action = get_action(a_type);
+        action.update_port_mapping();
+        update_action_to_npu(npu_id, action, false);
+    } catch (nas::base_exception& e) {
+        NAS_ACL_LOG_ERR("Err_code: 0x%x, fn: %s (), %s", e.err_code,
+                        e.err_fn.c_str(), e.err_msg.c_str());
+        return false;
+    } catch (std::exception& e) {
+        NAS_ACL_LOG_ERR("Unknown Err: %s", e.what());
+        return false;
+    }
+    return true;
 }

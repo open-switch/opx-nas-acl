@@ -182,6 +182,27 @@ class nas_acl_entry final : public nas::base_obj_t
             }
         }
 
+        bool filter_intf_mapping_update(BASE_ACL_MATCH_TYPE_t f_type,
+                                        hal_ifindex_t ifindex, npu_id_t npu_id) noexcept;
+
+        bool action_intf_mapping_update(BASE_ACL_ACTION_TYPE_t a_type,
+                                        hal_ifindex_t ifindex, npu_id_t npu_id) noexcept;
+
+        bool is_installed_to_npu(npu_id_t npu_id) const noexcept
+        {
+            return ndi_entry_ids.find(npu_id) != ndi_entry_ids.end();
+        }
+
+        // Extended existing override functions to include flag to specify if interface binding
+        // update is needed
+        bool push_create_obj_to_npu_ext (npu_id_t npu_id, void* ndi_obj, bool upd_intf_bind);
+        bool push_delete_obj_to_npu_ext (npu_id_t npu_id, bool upd_intf_bind);
+
+        void update_filter_to_npu(npu_id_t npu_id, const nas_acl_filter_t& filter,
+                                  bool del_filter);
+        void update_action_to_npu(npu_id_t npu_id, const nas_acl_action_t& action,
+                                  bool del_action);
+
     private:
         nas_obj_id_t                 _entry_id = 0;
         std::string                  _entry_name;

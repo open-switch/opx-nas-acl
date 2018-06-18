@@ -296,6 +296,51 @@ void nas_acl_filter_t::get_filter_ifindex_list (nas_acl_common_data_list_t& val_
     }
 }
 
+void nas_acl_filter_t::update_port_mapping() const
+{
+    interface_ctrl_t  intf_ctrl {};
+    if (_f_info.values_type == NDI_ACL_FILTER_PORT) {
+        if (_ifindex_list.size() != 1) {
+            NAS_ACL_LOG_ERR("Filter should contain only 1 interface");
+            return;
+        }
+        auto ifindex = _ifindex_list[0];
+        if (nas_acl_utl_is_ifidx_type_lag(ifindex)) {
+            return;
+        }
+        memset(&intf_ctrl, 0, sizeof(intf_ctrl));
+        nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
+
+        if (intf_ctrl.port_mapped) {
+            _match_port_mapped = true;
+            _f_info.data.values.ndi_port.npu_id = intf_ctrl.npu_id;
+            _f_info.data.values.ndi_port.npu_port = intf_ctrl.port_id;
+        } else {
+            _match_port_mapped = false;
+        }
+    } else if (_f_info.values_type == NDI_ACL_FILTER_PORTLIST) {
+        _npu_port_list.clear();
+        for (auto ifindex: _ifindex_list) {
+            if (nas_acl_utl_is_ifidx_type_lag(ifindex)) {
+                continue;
+            }
+            memset(&intf_ctrl, 0, sizeof(intf_ctrl));
+            nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
+
+            if (!intf_ctrl.port_mapped) {
+                continue;
+            }
+            if (_npu_port_list.find(intf_ctrl.npu_id) == _npu_port_list.end()) {
+                _npu_port_list[intf_ctrl.npu_id] = {intf_ctrl.port_id};
+            } else {
+                _npu_port_list[intf_ctrl.npu_id].push_back(intf_ctrl.port_id);
+            }
+        }
+    } else {
+        NAS_ACL_LOG_ERR("Filter is not port type");
+    }
+}
+
 void nas_acl_filter_t::set_filter_ifindex_list (const nas_acl_common_data_list_t& val_list)
 {
     _f_info.values_type  = NDI_ACL_FILTER_PORTLIST;
@@ -305,6 +350,8 @@ void nas_acl_filter_t::set_filter_ifindex_list (const nas_acl_common_data_list_t
             _ifindex_list.push_back (port);
         }
     }
+
+    update_port_mapping();
 }
 
 void nas_acl_filter_t::get_filter_ifindex (nas_acl_common_data_list_t& val_list) const
@@ -342,12 +389,8 @@ void nas_acl_filter_t::set_filter_ifindex (const nas_acl_common_data_list_t& val
         _nas2ndi_oid_tbl[oid] = std::move (tmp_ndi_oid_tbl);
         _f_info.values_type = NDI_ACL_FILTER_OBJ_ID;
     } else {
-        interface_ctrl_t  intf_ctrl {};
-        nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
-
         _f_info.values_type  = NDI_ACL_FILTER_PORT;
-        _f_info.data.values.ndi_port.npu_id = intf_ctrl.npu_id;
-        _f_info.data.values.ndi_port.npu_port = intf_ctrl.port_id;
+        update_port_mapping();
     }
 }
 
@@ -431,7 +474,7 @@ bool nas_acl_filter_t::_ndi_copy_one_obj_id(ndi_acl_entry_filter_t* ndi_filter_p
     if (it_npu_oid == ndi_oid_tbl.end()) {
         return false;
     }
-    NAS_ACL_LOG_DETAIL ("%s: NPU ID %d, NDI Obj Id %",
+    NAS_ACL_LOG_DETAIL ("%s: NPU ID %d, NDI Obj Id %lu",
                         name(), npu_id, it_npu_oid->second);
     ndi_filter_p->data.values.ndi_obj_ref = it_npu_oid->second;
     return true;
@@ -441,14 +484,14 @@ bool nas_acl_filter_t::copy_filter_ndi (ndi_acl_entry_filter_t* ndi_filter_p,
                                         npu_id_t npu_id,
                                         nas::mem_alloc_helper_t& mem_trakr) const
 {
+    *ndi_filter_p = _f_info;
+
     if (ndi_filter_p->values_type == NDI_ACL_FILTER_PORT &&
         _f_info.data.values.ndi_port.npu_id != npu_id)
     {
         NAS_ACL_LOG_DETAIL ("Skipping NPU %d - Filter has no ports", npu_id);
         return false;
     }
-
-    *ndi_filter_p = _f_info;
 
     if (ndi_filter_p->values_type == NDI_ACL_FILTER_OBJ_ID) {
         if (!_ndi_copy_one_obj_id(ndi_filter_p, npu_id)) {
@@ -463,27 +506,15 @@ bool nas_acl_filter_t::copy_filter_ndi (ndi_acl_entry_filter_t* ndi_filter_p,
         // Assert to ensure that we are not overwriting existing portlist
         STD_ASSERT (ndi_filter_p->data.values.ndi_portlist.port_list == NULL);
 
-        // Build the list of NPU specific ports
-        std::vector<ndi_port_t> ndi_plist;
-
-        for (auto ifindex: _ifindex_list) {
-            // Convert to NPU and port
-            interface_ctrl_t  intf_ctrl {};
-            nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
-            if (intf_ctrl.npu_id != npu_id) continue;
-            ndi_plist.push_back (ndi_port_t {intf_ctrl.npu_id, intf_ctrl.port_id});
-        }
-
-        // No ports from this NPU in the list ?
-        if (ndi_plist.empty()) {
-            NAS_ACL_LOG_DETAIL ("Skipping NPU %d - Filter has no ports", npu_id);
-            return false;
-        }
-
-        ndi_filter_p->data.values.ndi_portlist.port_count = ndi_plist.size();
-        ndi_port_t* plist =  mem_trakr.alloc<ndi_port_t> (ndi_plist.size());
+        ndi_filter_p->data.values.ndi_portlist.port_count = _npu_port_list[npu_id].size();
+        ndi_port_t* plist =  mem_trakr.alloc<ndi_port_t> (_npu_port_list[npu_id].size());
         ndi_filter_p->data.values.ndi_portlist.port_list = plist;
-        memcpy (plist, ndi_plist.data(), sizeof (ndi_port_t) * ndi_plist.size());
+        int idx = 0;
+        for (auto port_id: _npu_port_list[npu_id]) {
+            plist[idx].npu_id = npu_id;
+            plist[idx].npu_port = port_id;
+            idx ++;
+        }
     }
 
     return true;
@@ -553,7 +584,7 @@ void nas_acl_filter_t::dbg_dump () const
             for (auto ifindex: _ifindex_list) {
                 NAS_ACL_LOG_DUMP ("%d, ", ifindex);
             }
-            NAS_ACL_LOG_DUMP ("");
+            NAS_ACL_LOG_DUMP ("%s", "");
             break;
 
         case NDI_ACL_FILTER_MAC_ADDR:
@@ -611,23 +642,39 @@ void nas_acl_filter_t::dbg_dump () const
             break;
 
         case NDI_ACL_FILTER_U8LIST:
-            NAS_ACL_LOG_DUMP("   U8 List Value Count = %d",
+            NAS_ACL_LOG_DUMP("   U8 List Value Count = %lu",
                              _f_info.data.values.ndi_u8list.byte_count);
             NAS_ACL_LOG_DUMP("   U8 List Value =");
             for (size_t idx = 0; idx < _f_info.data.values.ndi_u8list.byte_count; idx ++) {
                 NAS_ACL_LOG_DUMP("%d, ", _f_info.data.values.ndi_u8list.byte_list[idx]);
             }
-            NAS_ACL_LOG_DUMP("");
-            NAS_ACL_LOG_DUMP("   U8 List Mask Count = %d",
+            NAS_ACL_LOG_DUMP ("%s", "");
+            NAS_ACL_LOG_DUMP("   U8 List Mask Count = %lu",
                              _f_info.mask.values.ndi_u8list.byte_count);
             NAS_ACL_LOG_DUMP("   U8 List Mask =");
             for (size_t idx = 0; idx < _f_info.mask.values.ndi_u8list.byte_count; idx ++) {
                 NAS_ACL_LOG_DUMP("%d, ", _f_info.mask.values.ndi_u8list.byte_list[idx]);
             }
-            NAS_ACL_LOG_DUMP("");
+            NAS_ACL_LOG_DUMP ("%s", "");
             break;
 
         default:
             break;
     }
+}
+
+bool nas_acl_filter_t::is_eligible_for_install(npu_id_t npu_id) const noexcept
+{
+    if (_f_info.values_type == NDI_ACL_FILTER_PORT) {
+        if (_f_info.data.values.ndi_port.npu_id != npu_id || !_match_port_mapped) {
+            return false;
+        }
+    } else if (_f_info.values_type == NDI_ACL_FILTER_PORTLIST) {
+        if (_npu_port_list.find(npu_id) == _npu_port_list.end() ||
+            _npu_port_list[npu_id].empty()) {
+            return false;
+        }
+    }
+
+    return true;
 }

@@ -1,0 +1,10 @@
+#!/bin/bash -e
+
+
+echo "Start test"
+
+pytest -s nas_acl_entry_test.py
+pytest -s nas_acl_virt_intf_test.py
+
+echo "End test"
+
