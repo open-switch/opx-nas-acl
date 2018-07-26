@@ -39,5 +39,56 @@ def test_check_entry():
         print "The Entry ID is:"+ str(e.extract_attr(cps_data,'id'))
         assert e.extract_attr(cps_data,'match/IP_PROTOCOL_VALUE/data') == 89
 
+def test_update_entry_action():
+    print 'Creating ACL table'
+    table_id = nas_acl.create_table('INGRESS', 100, ['IN_INTF'])
+    print 'Table ID: %d' % table_id
+    print 'Creating ACL entry'
+    entry_id = nas_acl.create_entry(table_id, 1, {'IN_INTF': 'e101-001-0'},
+                                    {'PACKET_ACTION': 'DROP'})
+    print 'Entry ID: %d' % entry_id
+    print 'Trying to set user trap ID with drop action (expected fail)'
+    with pytest.raises(RuntimeError):
+        nas_acl.replace_entry_action_list(table_id, entry_id,
+                                          {'PACKET_ACTION': 'DROP', 'SET_USER_TRAP_ID': 2})
+    nas_acl.print_entry(table_id, entry_id)
+    print 'Trying to set user trap ID with trap to CPU action'
+    try:
+        nas_acl.replace_entry_action_list(table_id, entry_id,
+                                          {'PACKET_ACTION': 'TRAP_TO_CPU', 'SET_USER_TRAP_ID': 2})
+    except RuntimeError:
+        assert False
+    nas_acl.print_entry(table_id, entry_id)
+    print 'Restoring ACL entry actions'
+    try:
+        nas_acl.replace_entry_action_list(table_id, entry_id,
+                                          {'PACKET_ACTION': 'DROP'})
+    except RuntimeError:
+        assert False
+    nas_acl.print_entry(table_id, entry_id)
+    print 'Deleting ACL entry'
+    nas_acl.delete_entry(table_id, entry_id)
+    print 'Deleting ACL table'
+    nas_acl.delete_table(table_id)
 
+def test_vlan_id_filter():
+    print 'Creating ACL table'
+    table_id = nas_acl.create_table('INGRESS', 100, ['OUTER_VLAN_ID', 'INNER_VLAN_ID'])
+    print 'Table ID: %d' % table_id
+    print 'Creating ACL entry'
+    entry_id_1 = nas_acl.create_entry(table_id, 1,
+                                {'OUTER_VLAN_ID': {'data': 0}, 'INNER_VLAN_ID': {'data': 0}},
+                                {'PACKET_ACTION': 'DROP'})
+    print 'Entry ID: %d' % entry_id_1
+    entry_id_2 = nas_acl.create_entry(table_id, 2,
+                                {'OUTER_VLAN_ID': {'data': 100}, 'INNER_VLAN_ID': {'data': 200}},
+                                {'PACKET_ACTION': 'DROP'})
+    print 'Entry ID: %d' % entry_id_2
 
+    nas_acl.print_entry(table_id)
+
+    print 'Deleting ACL entry'
+    nas_acl.delete_entry(table_id, entry_id_1)
+    nas_acl.delete_entry(table_id, entry_id_2)
+    print 'Deleting ACL table'
+    nas_acl.delete_table(table_id)

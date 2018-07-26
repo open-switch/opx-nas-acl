@@ -1039,10 +1039,28 @@ static void _utl_modify_alist_npulist_ndi (nas_acl_entry&   entry_new,
         }
 
         // Walk through the list of updated actions and add or modify them in NDI
-        for (nas_acl_entry::const_action_iter_t itr_add = add_or_mod_alist.begin();
-             itr_add != add_or_mod_alist.end(); ++itr_add) {
-
+        nas_acl_entry::const_action_iter_t itr_add = add_or_mod_alist.begin();
+        nas_acl_entry::const_action_iter_t saved_itr;
+        bool upd_set_trap_id = false;
+        while (itr_add != add_or_mod_alist.end() || upd_set_trap_id) {
+            if (itr_add == add_or_mod_alist.end()) {
+                itr_add = saved_itr;
+            }
             const nas_acl_action_t& a_add = nas_acl_entry::get_action_from_itr (itr_add);
+            if (a_add.action_type() == BASE_ACL_ACTION_TYPE_SET_USER_TRAP_ID) {
+                if (upd_set_trap_id) {
+                    itr_add = add_or_mod_alist.end();
+                    upd_set_trap_id = false;
+                } else {
+                    saved_itr = itr_add;
+                    ++itr_add;
+                    upd_set_trap_id = true;
+                    continue;
+                }
+            } else {
+                ++itr_add;
+            }
+
             NAS_ACL_LOG_DETAIL ("Push Enable %s to NPU %d",
                                 nas_acl_action_t::type_name(a_add.action_type()),
                                 npu_id);
