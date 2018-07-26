@@ -1,3 +1,9 @@
+opx-nas-acl (2.6.0+opx1) unstable; urgency=medium
+
+  * Bugfix: Service start-up dependencies and timing.
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Tue, 24 Jul 2018  11:36:00 -0800
+
 opx-nas-acl (2.6.0) unstable; urgency=medium
 
   * Feature: Routing VRF
