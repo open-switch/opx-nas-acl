@@ -1,3 +1,12 @@
+opx-nas-acl (2.6.0+opx2) unstable; urgency=medium
+
+  * Bugfix: Added an additional argument to the  NDI UDF match create function.
+  * Bugfix: Fixed the default L3 type mask value error.
+  * Update: Allow 0 as valid VLAN ID for filtering purpose.
+  * Bugfix: Fixed system-flow creation failure in S4200
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Fri, 10 Aug 2018  11:36:00 -0800
+
 opx-nas-acl (2.6.0+opx1) unstable; urgency=medium
 
   * Bugfix: Service start-up dependencies and timing.

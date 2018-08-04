@@ -70,7 +70,7 @@ public:
     void set_priority(uint8_t prio);
     void set_type(uint_t type);
     void set_ethertype(uint16_t type, uint16_t mask = 0xffff);
-    void set_ip_protocol(uint8_t type, uint8_t mask = 0xf);
+    void set_ip_protocol(uint8_t type, uint8_t mask = 0xff);
     void set_gre_tunnel(uint_t inner_type,
                         uint_t outer_type = INET_IP_VERSION_UNKNOWN);
     void add_udf_id(nas_obj_id_t udf_id);

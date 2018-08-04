@@ -213,9 +213,18 @@ void* nas_udf_match::alloc_fill_ndi_obj(nas::mem_alloc_helper_t& mem_trakr)
 {
     ndi_udf_match_t* ndi_match_p = mem_trakr.alloc<ndi_udf_match_t>(1);
     if (type() == BASE_UDF_UDF_MATCH_TYPE_NON_TUNNEL) {
-        ndi_match_p->type = NAS_NDI_UDF_MATCH_NON_TUNNEL;
-        ethertype(ndi_match_p->non_tunnel.l2_type, ndi_match_p->non_tunnel.l2_type_mask);
-        ip_protocol(ndi_match_p->non_tunnel.l3_type, ndi_match_p->non_tunnel.l3_type_mask);
+        if (is_attr_dirty(BASE_UDF_UDF_MATCH_TYPE)) {
+            ndi_match_p->type = NAS_NDI_UDF_MATCH_NON_TUNNEL;
+        }
+        if (is_attr_dirty(BASE_UDF_UDF_MATCH_PRIORITY)) {
+            ndi_match_p->priority = priority();
+        }
+        if (is_attr_dirty(BASE_UDF_UDF_MATCH_NON_TUNNEL_VALUE_L2_TYPE)) {
+            ethertype(ndi_match_p->non_tunnel.l2_type, ndi_match_p->non_tunnel.l2_type_mask);
+        }
+        if (is_attr_dirty(BASE_UDF_UDF_MATCH_NON_TUNNEL_VALUE_L3_TYPE)) {
+            ip_protocol(ndi_match_p->non_tunnel.l3_type, ndi_match_p->non_tunnel.l3_type_mask);
+        }
     } else {
         INET_IP_VERSION_t in_type = INET_IP_VERSION_UNKNOWN,
                           out_type = INET_IP_VERSION_UNKNOWN;

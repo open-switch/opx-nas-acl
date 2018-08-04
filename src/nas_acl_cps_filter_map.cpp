@@ -276,7 +276,7 @@ static const auto& _filter_map = *new nas_acl_filter_map_t
                     NAS_ACL_DATA_U16,
                     sizeof (uint16_t),
                     NAS_ACL_ATTR_MODE_MANDATORY,
-                    {1, NAS_MAX_VLAN_ID},
+                    {0, NAS_MAX_VLAN_ID},
                 },
                 {
                     BASE_ACL_ENTRY_MATCH_OUTER_VLAN_ID_VALUE_MASK,
@@ -350,7 +350,7 @@ static const auto& _filter_map = *new nas_acl_filter_map_t
                     NAS_ACL_DATA_U16,
                     sizeof (uint16_t),
                     NAS_ACL_ATTR_MODE_MANDATORY,
-                    {1, NAS_MAX_VLAN_ID},
+                    {0, NAS_MAX_VLAN_ID},
                 },
                 {
                     BASE_ACL_ENTRY_MATCH_INNER_VLAN_ID_VALUE_MASK,
