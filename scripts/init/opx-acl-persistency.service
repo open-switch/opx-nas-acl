@@ -9,7 +9,7 @@ EnvironmentFile=/etc/opx/opx-environment
 ExecStart=/usr/bin/acl-config
 KillSignal=SIGKILL
 SuccessExitStatus=SIGKILL
-TimeoutStartSec=90
+TimeoutStartSec=180
 
 # Resource Limitations
 LimitCORE=infinity

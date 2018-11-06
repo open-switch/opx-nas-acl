@@ -78,6 +78,7 @@ class nas_acl_filter_t
         void get_filter_ifindex (nas_acl_common_data_list_t& val_list) const;
         void get_udf_filter_val (nas_acl_common_data_list_t& val_list) const;
         void get_obj_id_list_filter_val(nas_acl_common_data_list_t& val_list) const;
+        void get_bridge_type_filter_val (nas_acl_common_data_list_t& val_list) const;
 
         const nas::ifindex_list_t& get_filter_if_list () const noexcept;
         nas::npu_set_t get_npu_list () const;
@@ -98,6 +99,7 @@ class nas_acl_filter_t
         void set_filter_ifindex (const nas_acl_common_data_list_t& val_list);
         void set_udf_filter_val (const nas_acl_common_data_list_t& val_list);
         void set_obj_id_list_filter_val(const nas_acl_common_data_list_t& val_list);
+        void set_bridge_type_filter_val (const nas_acl_common_data_list_t& val_list);
 
         bool copy_filter_ndi (ndi_acl_entry_filter_t* ndi_filter_p,
                               npu_id_t npu_id, nas::mem_alloc_helper_t& m) const;

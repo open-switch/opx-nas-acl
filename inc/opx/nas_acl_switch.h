@@ -37,6 +37,12 @@
 #include <unordered_map>
 #include <vector>
 
+struct acl_pool_id_t
+{
+    npu_id_t     npu_id;
+    nas_obj_id_t pool_id;
+};
+
 struct pbr_entry_id_t
 {
     nas_obj_id_t tbl_id;
@@ -76,6 +82,8 @@ class nas_acl_switch : public nas::base_switch_t
 
         typedef std::map<nas_obj_id_t, nas_acl_range> range_list_t;
 
+        typedef std::vector<acl_pool_id_t> acl_pool_list_t;
+
         ///// Constructor ////
         nas_acl_switch (nas_obj_id_t id): nas::base_switch_t (id) {};
 
@@ -112,6 +120,11 @@ class nas_acl_switch : public nas::base_switch_t
 
         nas_acl_range*        find_acl_range(nas_obj_id_t range_id) noexcept;
         const range_list_t& range_obj_list() const noexcept {return _range_objs;}
+
+        acl_pool_id_t*         find_acl_pool(npu_id_t npu_id, nas_obj_id_t id) noexcept;
+        const acl_pool_list_t& acl_pool_obj_list() const noexcept {return _cached_acl_pool_entries;}
+        void                   mark_acl_pool_cache_init_done () noexcept {_nas_acl_pool_cache_init_done = true;}
+        bool                   is_acl_pool_cache_init_done () const noexcept {return _nas_acl_pool_cache_init_done;}
 
         ///////// Modifiers //////////
         ///// ACL Table list
@@ -176,6 +189,9 @@ class nas_acl_switch : public nas::base_switch_t
         nas_acl_range& save_acl_range(nas_acl_range&& acl_range) noexcept;
         void remove_acl_range(nas_obj_id_t id) noexcept;
 
+        bool save_acl_pool(npu_id_t npu_id, nas_obj_id_t id) noexcept;
+        void remove_acl_pool(npu_id_t npu_id, nas_obj_id_t id) noexcept;
+
         void delete_pbr_action_by_nh_obj (ndi_obj_id_t nh_obj_id) noexcept;
         void add_pbr_entry_to_cache(nas_obj_id_t tbl_id, nas_obj_id_t entry_id);
         void del_pbr_entry_from_cache(nas_obj_id_t tbl_id, nas_obj_id_t entry_id);
@@ -219,6 +235,9 @@ class nas_acl_switch : public nas::base_switch_t
         range_list_t            _range_objs;
 
         nas::id_generator_t     _range_id_gen {NAS_ACL_RANGE_ID_MAX};
+
+        acl_pool_list_t         _cached_acl_pool_entries;
+        bool                    _nas_acl_pool_cache_init_done = false;
 
         // cache content: <table-id, entry-id>
         std::vector<pbr_entry_id_t> _cached_pbr_entries;

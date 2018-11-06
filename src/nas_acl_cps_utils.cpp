@@ -804,6 +804,7 @@ nas_acl_copy_data_to_obj (cps_api_object_t               obj,
         case NAS_ACL_DATA_OBJ_ID_LIST:
             rc = _copy_objlist_data_to_obj (obj, parent_list, common_data_list);
             break;
+
         default:
             rc = false;
             break;

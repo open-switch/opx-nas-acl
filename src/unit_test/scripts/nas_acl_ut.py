@@ -36,7 +36,7 @@ def acl_ut_table_create(prio=None):
                                    allow_filters=[
                                    'SRC_IP', 'SRC_MAC', 'DST_IP', 'IP_TYPE',
                                    'TCP_FLAGS', 'DSCP', 'ECN', 'IPV6_FLOW_LABEL',
-                                   'IN_PORTS', 'IN_PORT'])
+                                   'IN_PORTS', 'IN_PORT'], allow_actions=['PACKET_ACTION','SET_CPU_QUEUE'])
     except RuntimeError as r:
         print (sys._getframe().f_code.co_name + ": Error creating Table")
         return None

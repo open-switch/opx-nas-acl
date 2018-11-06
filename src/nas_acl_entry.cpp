@@ -52,6 +52,7 @@ const char*  nas_acl_entry::table_name() const noexcept
 {
     return _table_p->table_name();
 }
+
 // Override base npu_list routine to return a more restrictive
 // NPU list in case the ACL entry is qualified with in ports or out ports
 const nas::npu_set_t&  nas_acl_entry::npu_list () const
@@ -72,6 +73,7 @@ void nas_acl_entry::set_entry_name (const char* name)
 {
     _entry_name = name;
 }
+
 void nas_acl_entry::copy_table_npus ()
 {
     // Reset to the table NPU list
@@ -712,6 +714,7 @@ static void _utl_push_disable_filter_to_npu (nas_acl_entry& acl_entry,
     if (f_type == BASE_ACL_MATCH_TYPE_RANGE_CHECK) {
         _update_range_ref_cnt(acl_entry, false);
     }
+
     NAS_ACL_LOG_DETAIL ("ACL Entry NDI: Disabled Filter %s in NPU %d",
                         nas_acl_filter_t::type_name (f_type), npu_id);
 }
@@ -733,6 +736,7 @@ static void _utl_push_filter_to_npu (nas_acl_entry& acl_entry,
         _copy_ndi_range_id_list(acl_entry, ndi_filter, npu_id, mem_trakr);
         _update_range_ref_cnt(acl_entry, true);
     }
+
     t_std_error rc;
 
     if ((rc = ndi_acl_entry_set_filter (npu_id, acl_entry.ndi_entry_ids.at (npu_id),
@@ -825,6 +829,7 @@ static void _utl_modify_flist_npulist_ndi (nas_acl_entry&   entry_new,
              itr_add != add_or_mod_flist.end(); ++itr_add) {
 
             const nas_acl_filter_t& f_add = nas_acl_entry::get_filter_from_itr (itr_add);
+
             if (f_add.is_range() && entry_old.is_range_enabled()) {
                 /* Firstly decrement ref count of ranges associated with old entry */
                 _update_range_ref_cnt(entry_old, false);

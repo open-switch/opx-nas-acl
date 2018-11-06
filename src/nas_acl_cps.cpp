@@ -152,6 +152,10 @@ nas_acl_cps_api_read (void                 *context,
             rc = nas_acl_get_range(param, index, filter_obj);
             break;
 
+        case BASE_ACL_SWITCHING_ENTITY_OBJ:
+            rc = nas_acl_profile_info_get (param, index, filter_obj);
+            break;
+
         default:
             break;
     }
@@ -468,6 +472,141 @@ nas_acl_delete_nh_acl_entry_action (void               *context,
     }
 
     NAS_ACL_LOG_BRIEF("Delete next hop ACL entry action EXITS");
+
+    return cps_api_ret_code_OK;
+}
+
+
+cps_api_return_code_t
+nas_acl_pool_info_cps_api_read (void                 *context,
+                                cps_api_get_params_t *param,
+                                size_t                index) noexcept
+{
+    t_std_error rc = NAS_ACL_E_UNSUPPORTED;
+
+    cps_api_object_t filter_obj = cps_api_object_list_get (param->filters, index);
+
+    if (filter_obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Filter Object");
+        return cps_api_ret_code_ERR;
+    }
+
+    nas_acl_lock ();
+
+    rc = nas_acl_pool_info_get (param, index, filter_obj);
+
+    nas_acl_unlock ();
+
+    if (rc != STD_ERR_OK)
+        return cps_api_ret_code_ERR;
+
+    return cps_api_ret_code_OK;
+}
+
+
+cps_api_return_code_t
+nas_acl_table_info_cps_api_read (void                 *context,
+                                 cps_api_get_params_t *param,
+                                 size_t                index) noexcept
+{
+    t_std_error rc = NAS_ACL_E_UNSUPPORTED;
+
+    cps_api_object_t filter_obj = cps_api_object_list_get (param->filters, index);
+
+    if (filter_obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Filter Object");
+        return cps_api_ret_code_ERR;
+    }
+
+    nas_acl_lock ();
+
+    rc = nas_acl_table_info_get (param, index, filter_obj);
+
+    nas_acl_unlock ();
+
+    if (rc != STD_ERR_OK)
+        return cps_api_ret_code_ERR;
+
+    return cps_api_ret_code_OK;
+}
+
+
+cps_api_return_code_t
+nas_acl_profile_cps_api_read (void                 *context,
+                              cps_api_get_params_t *param,
+                              size_t                index) noexcept
+{
+    t_std_error rc = NAS_ACL_E_UNSUPPORTED;
+
+    cps_api_object_t filter_obj = cps_api_object_list_get (param->filters, index);
+
+    if (filter_obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Filter Object");
+        return cps_api_ret_code_ERR;
+    }
+
+    nas_acl_lock ();
+
+    rc = nas_acl_profile_app_group_info_get (param, index, filter_obj);
+
+    nas_acl_unlock ();
+
+    if (rc != STD_ERR_OK)
+        return cps_api_ret_code_ERR;
+
+    return cps_api_ret_code_OK;
+}
+
+cps_api_return_code_t
+nas_acl_profile_cps_api_write (void                         *context,
+                               cps_api_transaction_params_t *param,
+                               size_t                        index) noexcept
+{
+    bool                      rollback = false;
+    cps_api_object_t          obj;
+    cps_api_operation_types_t op;
+
+    obj = cps_api_object_list_get (param->change_list, index);
+
+    if (obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Change Object");
+        return cps_api_ret_code_ERR;
+    }
+
+    op = cps_api_object_type_operation (cps_api_object_key (obj));
+
+    if (op != cps_api_oper_SET)
+    {
+        NAS_ACL_LOG_ERR ("Operation %d NOT allowed on Obj", op);
+        return NAS_ACL_E_UNSUPPORTED;
+    }
+
+    cps_api_object_t prev = NULL;
+
+    if (!rollback) {
+        prev = cps_api_object_list_create_obj_and_append (param->prev);
+        if (prev == NULL) {
+            return (NAS_ACL_E_MEM);
+        }
+    }
+
+    t_std_error rc;
+
+    nas_acl_lock ();
+
+    rc = nas_acl_profile_set (obj, prev, rollback);
+
+    nas_acl_unlock ();
+
+    return rc;
+}
+
+cps_api_return_code_t
+nas_acl_profile_cps_api_rollback (void                         *context,
+                                  cps_api_transaction_params_t *param,
+                                  size_t                        index) noexcept
+{
+    /* rollback not supported as of now */
 
     return cps_api_ret_code_OK;
 }
