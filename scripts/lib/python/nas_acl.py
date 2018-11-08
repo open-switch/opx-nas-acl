@@ -255,7 +255,7 @@ def append_entry_action(table_id, entry_id, action_type, action_val):
     if r == False:
         raise RuntimeError("Entry action append failed")
     else:
-        print "Appended the action %s with value %d to %d and %d" %(action_type,action_val,table_id,entry_id)    
+        print "Appended the action %s with value %d to %d and %d" %(action_type,action_val,table_id,entry_id)
 
 
 # Change existing action value in the ACL entry

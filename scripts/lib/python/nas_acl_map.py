@@ -76,6 +76,8 @@ filter_name2val_map = {
     'UDF': 'UDF_VALUE',
     'IPV6_NEXT_HEADER': 'IPV6_NEXT_HEADER_VALUE',
     'RANGE_CHECK': 'RANGE_CHECK_VALUE',
+    'DROP_MARKED': 'DROP_MARKED_VALUE',
+    'BRIDGE_TYPE': 'BRIDGE_TYPE_VALUE',
 }
 
 action_name2val_map = {
@@ -252,6 +254,8 @@ entry_attr_map = {
     'match/NEIGHBOR_DST_HIT_VALUE': ('leaf', 'bool'),
     'match/ROUTE_DST_HIT_VALUE': ('leaf', 'bool'),
     'match/FDB_DST_HIT_VALUE': ('leaf', 'bool'),
+    'match/DROP_MARKED_VALUE': ('leaf', 'bool'),
+    'match/BRIDGE_TYPE_VALUE': ('leaf', 'enum', 'base-acl:match-bridge-type:'),
 
     'action/PACKET_ACTION_VALUE':
     ('leaf', 'enum', 'base-acl:packet-action-type:'),
@@ -404,6 +408,8 @@ enum_map = {
     'base-acl:match-type:IPV6_NEXT_HEADER': 43,
     'base-acl:match-type:RANGE_CHECK': 44,
     'base-acl:match-type:FDB_DST_HIT': 45,
+    'base-acl:match-type:DROP_MARKED': 46,
+    'base-acl:match-type:BRIDGE_TYPE': 47,
 
     'base-acl:packet-action-type:DROP': 1,
     'base-acl:packet-action-type:FORWARD': 2,
@@ -437,6 +443,9 @@ enum_map = {
 
     'base-acl:af-type:INET': 2,
     'base-acl:af-type:INET6': 10,
+
+    'base-acl:match-bridge-type:BRIDGE_1Q': 1,
+    'base-acl:match-bridge-type:BRIDGE_1D': 2,
 }
 
 

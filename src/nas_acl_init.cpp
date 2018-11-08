@@ -177,6 +177,100 @@ static t_std_error _cps_init ()
         return STD_ERR(ACL,FAIL,rc);
     }
 
+    memset (&f, 0, sizeof(f));
+
+    f.handle             = handle;
+    f._read_function     = nas_acl_profile_cps_api_read;
+    f._write_function    = nas_acl_profile_cps_api_write;
+    f._rollback_function = nas_acl_profile_cps_api_rollback;
+
+    /*
+     * Register all ACL profile objects
+     */
+    if (!cps_api_key_from_attr_with_qual(&f.key,BASE_ACL_SWITCHING_ENTITY_APP_GROUP,
+                                         cps_api_qualifier_TARGET)) {
+        NAS_ACL_LOG_ERR ("Could not translate %d to key %s",
+                        (int)(BASE_ACL_SWITCHING_ENTITY_APP_GROUP),
+                        cps_api_key_print(&f.key,buff,sizeof(buff)-1));
+
+        return STD_ERR(ACL,FAIL,0);
+    }
+
+    rc = cps_api_register (&f);
+    if (rc != cps_api_ret_code_OK) {
+        NAS_ACL_LOG_ERR ("NAS ACL Profile CPS object Register failed");
+        return STD_ERR(ACL, FAIL, rc);
+    }
+
+    memset (&f, 0, sizeof(f));
+
+    f.handle             = handle;
+    f._read_function     = nas_acl_profile_cps_api_read;
+
+    /*
+     * Register all ACL profile objects observed qualifier
+     */
+    if (!cps_api_key_from_attr_with_qual(&f.key,BASE_ACL_SWITCHING_ENTITY_APP_GROUP,
+                                         cps_api_qualifier_OBSERVED)) {
+        NAS_ACL_LOG_ERR ("Could not translate %d to key %s with observed qualifier",
+                        (int)(BASE_ACL_SWITCHING_ENTITY_APP_GROUP),
+                        cps_api_key_print(&f.key,buff,sizeof(buff)-1));
+
+        return STD_ERR(ACL,FAIL,0);
+    }
+
+    rc = cps_api_register (&f);
+    if (rc != cps_api_ret_code_OK) {
+        NAS_ACL_LOG_ERR ("NAS ACL Profile CPS object Register failed for observed qualifier");
+        return STD_ERR(ACL, FAIL, rc);
+    }
+
+    memset (&f, 0, sizeof(f));
+
+    f.handle             = handle;
+    f._read_function     = nas_acl_pool_info_cps_api_read;
+
+    /*
+     * Register all ACL pool info objects observed qualifier
+     */
+    if (!cps_api_key_from_attr_with_qual(&f.key,BASE_ACL_ACL_POOL_INFO_OBJ,
+                                         cps_api_qualifier_OBSERVED)) {
+        NAS_ACL_LOG_ERR ("Could not translate %d to key %s with observed qualifier",
+                        (int)(BASE_ACL_ACL_POOL_INFO_OBJ),
+                        cps_api_key_print(&f.key,buff,sizeof(buff)-1));
+
+        return STD_ERR(ACL,FAIL,0);
+    }
+
+    rc = cps_api_register (&f);
+    if (rc != cps_api_ret_code_OK) {
+        NAS_ACL_LOG_ERR ("NAS ACL pool info CPS object Register failed for observed qualifier");
+        return STD_ERR(ACL, FAIL, rc);
+    }
+
+    memset (&f, 0, sizeof(f));
+
+    f.handle             = handle;
+    f._read_function     = nas_acl_table_info_cps_api_read;
+
+    /*
+     * Register all ACL table info objects observed qualifier
+     */
+    if (!cps_api_key_from_attr_with_qual(&f.key,BASE_ACL_ACL_TABLE_OBJ,
+                                         cps_api_qualifier_OBSERVED)) {
+        NAS_ACL_LOG_ERR ("Could not translate %d to key %s with observed qualifier",
+                        (int)(BASE_ACL_ACL_TABLE_OBJ),
+                        cps_api_key_print(&f.key,buff,sizeof(buff)-1));
+
+        return STD_ERR(ACL,FAIL,0);
+    }
+
+    rc = cps_api_register (&f);
+    if (rc != cps_api_ret_code_OK) {
+        NAS_ACL_LOG_ERR ("NAS ACL table info CPS object Register failed for observed qualifier");
+        return STD_ERR(ACL, FAIL, rc);
+    }
+
     // Register interface creation/deletion event
     cps_api_event_reg_t reg;
     cps_api_key_t key;

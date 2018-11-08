@@ -1083,6 +1083,21 @@ static const auto& _filter_map = *new nas_acl_filter_map_t
         },
     },
 
+    {BASE_ACL_MATCH_TYPE_BRIDGE_TYPE,
+        {
+            "MATCH_TYPE_BRIDGE_TYPE",
+            {
+                BASE_ACL_ENTRY_MATCH_BRIDGE_TYPE_VALUE,
+                NAS_ACL_DATA_U32,
+                sizeof (uint32_t),
+                NAS_ACL_ATTR_MODE_MANDATORY,
+                {},
+            },
+            {},
+            &nas_acl_filter_t::get_bridge_type_filter_val,
+            &nas_acl_filter_t::set_bridge_type_filter_val,
+        },
+    },
 };
 
 // Return name of given filter type id

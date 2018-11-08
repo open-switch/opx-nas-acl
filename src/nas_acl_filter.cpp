@@ -96,6 +96,19 @@ static bool _validate_ip_frag_data (uint32_t ip_frag) noexcept
     return true;
 }
 
+static bool _validate_bridge_type_data (uint32_t bridge_type) noexcept
+{
+    switch (bridge_type) {
+        case BASE_ACL_BRIDGE_TYPE_BRIDGE_1Q:
+        case BASE_ACL_BRIDGE_TYPE_BRIDGE_1D:
+            break;
+
+        default:
+            return false;
+    }
+    return true;
+}
+
 void nas_acl_filter_t::get_u32_filter_val (nas_acl_common_data_list_t& val_list) const
 {
     nas_acl_common_data_t match_data = {};
@@ -462,6 +475,27 @@ void nas_acl_filter_t::get_obj_id_list_filter_val (nas_acl_common_data_list_t& d
     data_list.push_back (data);
 }
 
+void nas_acl_filter_t::get_bridge_type_filter_val (nas_acl_common_data_list_t& val_list) const
+{
+    nas_acl_common_data_t data{};
+
+    data.u32 = _f_info.data.values.u32;
+
+    val_list.push_back (data);
+}
+
+void nas_acl_filter_t::set_bridge_type_filter_val (const nas_acl_common_data_list_t& val_list)
+{
+    auto val = val_list.at(0).u32;
+
+    if (!_validate_bridge_type_data (val)) {
+        throw nas::base_exception {NAS_ACL_E_ATTR_VAL, __PRETTY_FUNCTION__,
+            std::string {"Invalid bridge type value "} + std::to_string (val)};
+    }
+    _f_info.values_type  = NDI_ACL_FILTER_BRIDGE_TYPE;
+    _f_info.data.values.u32 = val;
+}
+
 bool nas_acl_filter_t::_ndi_copy_one_obj_id(ndi_acl_entry_filter_t* ndi_filter_p,
                                             npu_id_t npu_id) const
 {
@@ -656,6 +690,10 @@ void nas_acl_filter_t::dbg_dump () const
                 NAS_ACL_LOG_DUMP("%d, ", _f_info.mask.values.ndi_u8list.byte_list[idx]);
             }
             NAS_ACL_LOG_DUMP ("%s", "");
+            break;
+
+        case NDI_ACL_FILTER_BRIDGE_TYPE:
+            NAS_ACL_LOG_DUMP ("  bridge_type = %d", _f_info.data.values.u32);
             break;
 
         default:

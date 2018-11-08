@@ -17,6 +17,7 @@
 
 #include "ds_common_types.h"
 #include "hal_if_mapping.h"
+#include "nas_ndi_switch.h"
 #include "nas_ndi_acl.h"
 #include "nas_ndi_udf.h"
 #include "std_error_codes.h"
@@ -355,6 +356,23 @@ t_std_error ndi_acl_range_create(npu_id_t npu_id, const ndi_acl_range_t *acl_ran
 }
 
 t_std_error ndi_acl_range_delete(npu_id_t npu_id, ndi_obj_id_t ndi_range_id)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_switch_get_slice_list(npu_id_t npu_id, nas_ndi_switch_param_t *param)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_acl_get_slice_attribute (npu_id_t npu_id, ndi_obj_id_t slice_id,
+                                         ndi_acl_slice_attr_t *slice_attr)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_acl_get_acl_table_attribute (npu_id_t npu_id, ndi_obj_id_t table_id,
+                                             ndi_acl_table_attr_t *table_attr)
 {
     return STD_ERR_OK;
 }

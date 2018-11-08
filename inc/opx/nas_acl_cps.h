@@ -131,8 +131,28 @@ cps_api_return_code_t nas_acl_delete_nh_acl_entry_action (void *context,
                         cps_api_transaction_params_t *param,
                        size_t ix) noexcept;
 
+cps_api_return_code_t nas_acl_profile_cps_api_read (void * context,
+                                                    cps_api_get_params_t * param,
+                                                    size_t ix) noexcept;
+
+cps_api_return_code_t nas_acl_profile_cps_api_write (void * context,
+                                                     cps_api_transaction_params_t * param,
+                                                     size_t ix) noexcept;
+
+cps_api_return_code_t nas_acl_profile_cps_api_rollback (void * context,
+                                                        cps_api_transaction_params_t * param,
+                                                        size_t index_of_element_being_updated) noexcept;
+
 cps_api_object_attr_t nas_acl_get_attr (const cps_api_object_it_t& it,
                                         cps_api_attr_id_t attr_id, bool* is_dupl) noexcept;
+
+cps_api_return_code_t nas_acl_pool_info_cps_api_read (void * context,
+                                                      cps_api_get_params_t * param,
+                                                      size_t ix) noexcept;
+
+cps_api_return_code_t nas_acl_table_info_cps_api_read (void * context,
+                                                       cps_api_get_params_t * param,
+                                                       size_t ix) noexcept;
 
 t_std_error           nas_acl_get_table (cps_api_get_params_t *param, size_t index,
                                          cps_api_object_t filter_obj) noexcept;
@@ -147,6 +167,14 @@ t_std_error           nas_acl_get_counter (cps_api_get_params_t *param, size_t i
 t_std_error           nas_acl_stats_info_get (cps_api_get_params_t *param,
                                               size_t                index,
                                               const nas_acl_counter_t&  counter) noexcept;
+
+t_std_error           nas_acl_pool_info_get (cps_api_get_params_t *param,
+                                             size_t index,
+                                             cps_api_object_t filter_obj) noexcept;
+
+t_std_error           nas_acl_table_info_get (cps_api_get_params_t *param,
+                                              size_t index,
+                                              cps_api_object_t filter_obj) noexcept;
 
 nas_acl_write_operation_map_t *
 nas_acl_get_table_operation_map (cps_api_operation_types_t op) noexcept;
@@ -252,5 +280,15 @@ t_std_error           nas_udf_delete(cps_api_object_t obj,
 
 t_std_error           nas_acl_get_range (cps_api_get_params_t *param, size_t index,
                                          cps_api_object_t filter_obj) noexcept;
+
+t_std_error           nas_acl_profile_info_get (cps_api_get_params_t *param, size_t index,
+                                                cps_api_object_t filter_obj) noexcept;
+
+t_std_error           nas_acl_profile_app_group_info_get (cps_api_get_params_t *param, size_t index,
+                                                          cps_api_object_t filter_obj) noexcept;
+
+t_std_error           nas_acl_profile_set (cps_api_object_t obj,
+                                           cps_api_object_t prev,
+                                           bool             is_rollbk_op) noexcept;
 
 #endif

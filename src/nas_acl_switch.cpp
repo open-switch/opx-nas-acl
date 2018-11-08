@@ -568,6 +568,76 @@ void nas_acl_switch::remove_acl_range(nas_obj_id_t range_id) noexcept
     _range_objs.erase(range_id);
 }
 
+//Find given ACL pool in the cached NPU ACL pool entries
+//This is called during retrieval of ACL pool info
+acl_pool_id_t* nas_acl_switch::find_acl_pool (npu_id_t npu_id, nas_obj_id_t acl_pool_obj_id) noexcept
+{
+    for (auto iter = _cached_acl_pool_entries.begin();
+         iter != _cached_acl_pool_entries.end();
+         ++iter)
+    {
+        if ((iter->npu_id == npu_id) &&
+            (iter->pool_id == acl_pool_obj_id))
+        {
+            NAS_ACL_LOG_BRIEF("Found ACL Pool entry npu_id %d, pool_id 0x%lx from cache",
+                              npu_id, acl_pool_obj_id);
+
+            return &(*iter);
+        }
+    }
+    return nullptr;
+}
+
+//Save given ACL pool in the cached NPU ACL pool entries.
+//This is called at first time to initialize the NPU pool entries.
+bool nas_acl_switch::save_acl_pool(npu_id_t npu_id, nas_obj_id_t nas_acl_pool_id) noexcept
+{
+    bool found = false;
+
+    for (auto iter = _cached_acl_pool_entries.begin();
+         iter != _cached_acl_pool_entries.end();
+         ++iter)
+    {
+        if ((iter->npu_id == npu_id) &&
+            (iter->pool_id == nas_acl_pool_id))
+        {
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        acl_pool_id_t acl_pool_id;
+        acl_pool_id.npu_id = npu_id;
+        acl_pool_id.pool_id = nas_acl_pool_id;
+
+        _cached_acl_pool_entries.push_back(acl_pool_id);
+        NAS_ACL_LOG_BRIEF("Adding ACL Pool entry npu_id %d, pool_id 0x%lx to cache",
+                          npu_id, nas_acl_pool_id);
+    }
+
+    // if pool-id exists already return failure for now.
+    return !found;
+}
+
+//Remove given ACL pool from the cached NPU ACL pool entries.
+void nas_acl_switch::remove_acl_pool(npu_id_t npu_id, nas_obj_id_t nas_acl_pool_id) noexcept
+{
+    for (auto iter = _cached_acl_pool_entries.begin();
+         iter != _cached_acl_pool_entries.end();
+         ++iter)
+    {
+        if ((iter->npu_id == npu_id) &&
+            (iter->pool_id == nas_acl_pool_id))
+        {
+            NAS_ACL_LOG_BRIEF("Deleting ACL Pool entry npu_id %d, pool_id 0x%lx from cache",
+                              npu_id, nas_acl_pool_id);
+            _cached_acl_pool_entries.erase(iter);
+            break;
+        }
+    }
+}
+
 void nas_acl_switch::add_intf_acl_bind(hal_ifindex_t ifindex, const acl_rule_item_info_t& rule_item)
 {
     interface_ctrl_t intf_ctrl;

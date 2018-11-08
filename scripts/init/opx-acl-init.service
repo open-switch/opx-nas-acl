@@ -6,7 +6,7 @@ Requires=opx-cps.service opx-nas.service
 [Service]
 EnvironmentFile=/etc/opx/opx-environment
 ExecStart=/usr/bin/python -u /usr/bin/base_create_acl_entries.py
-TimeoutStartSec=90
+TimeoutStartSec=180
 
 [Install]
 WantedBy=multi-user.target

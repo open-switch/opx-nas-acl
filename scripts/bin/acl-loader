@@ -16,3 +16,5 @@ obj.add_attr('acl-config/reload/input/filename',sys.argv[1])
 tr = cps_operations.CPSTransaction()
 tr.rpc(obj.get())
 _res = cps.commit(tr.get_objects())
+print (_res)
+
