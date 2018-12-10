@@ -1,3 +1,5 @@
+© 2018 OpenSwitch project. All information is contributed to and made available by OPX under the Creative Commons Attribution 4.0 International License (available at http://creativecommons.org/licenses/by/4.0/).
+
 # ACL Configuration Persistency
 
 ## How it works
@@ -30,7 +32,7 @@ Each entry contains the following options:
 - `-i [interface-name]`: Interface
 - `-d [ip-address/mask]`: Destination IP address/mask
 - `-s [ip-address/mask]`: Source IP address/mask
-- `-j {DROP|ACCEPT}`: This specifies the target of the rule; i.e., what to do if the packet matches it. 
+- `-j {DROP|ACCEPT}`: This specifies the target of the rule; i.e., what to do if the packet matches it.
 - `--tcp-flags {SYN|RST|FIN|ACK}`: Specific TCP flags to match on
 - `--sport [port-number]`: Source TCP/UDP port
 - `--dport [port-number]`: Destination TCP/UDP port
@@ -41,12 +43,12 @@ Each entry contains the following options:
 
 ### `bin/acl-loader`
 
-If any changes are made to the `acl-config.yaml` file like adding, modifying, or deleting a rule, 
-`acl-loader <filename>` is used to dynamically re-load the ACL rules defined in the file. 
-The rules that are removed from the yaml file will get removed from the hardware and the 
+If any changes are made to the `acl-config.yaml` file like adding, modifying, or deleting a rule,
+`acl-loader <filename>` is used to dynamically re-load the ACL rules defined in the file.
+The rules that are removed from the yaml file will get removed from the hardware and the
 rules that are modified or added will get programmed in the hardware.
 
---- 
+---
 
 ### `bin/acl-config`
 
