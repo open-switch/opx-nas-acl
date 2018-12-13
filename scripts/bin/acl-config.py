@@ -53,7 +53,7 @@ def __get_table(type,fields):
 
     out = []
     if cps.get ([nas_acl.TableCPSObj (table_id=_table_id).data()], out) == True:
-        if len(out) > 0:
+        if out:
             return nas_acl.TableCPSObj(cps_data=out[0])
     return None
 
@@ -118,7 +118,7 @@ def __acl_cfg_to_acl_entry(obj, create_if_not_there=False):
         _entry_id = obj.get_attr_data('base-acl/entry/id')
         _table_id = obj.get_attr_data('base-acl/table/id')
         _lst = __get_acl_entries(_table_id,_entry_id)
-        if len(_lst) > 0:
+        if _lst:
             return obj.get()
         print('Invalid ACL entry details - %d and %d' % (_table_id,_entry_id))
     except:
@@ -237,7 +237,7 @@ def __acl_cfg_to_acl_entry(obj, create_if_not_there=False):
         cps.db_commit(_obj,None,True)
         return _obj
 
-    if _entry == None and create_if_not_there:
+    if _entry is None and create_if_not_there:
         _entry_id = None
         try :
             _entry_id = nas_acl.create_entry(table_id=_table.extract_id(),prio=_prio,filter_map=_filters,action_map=_actions)
@@ -347,7 +347,7 @@ def __resync():
 
     for _i in _db:
         _entry = cps_object.CPSObject(obj=__acl_cfg_to_acl_entry(_i,True))
-        if _entry == None:
+        if _entry is None:
             print('Error creating ACL entries.  Consult the logs for more details.')
 
         _table = _entry.get_attr_data('base-acl/table/id')
