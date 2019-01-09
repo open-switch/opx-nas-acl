@@ -1,3 +1,15 @@
+opx-nas-acl (2.8.0+opx5) unstable; urgency=medium
+
+  * feat: Add plugin for sosreport
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Wed, 9 Jan 2019  13:30:00 -0800
+
+opx-nas-acl (2.8.0+opx4) unstable; urgency=medium
+
+  * feat: Add flag file to prevent ACL creation at startup
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Wed, 9 Jan 2019  12:00:00 -0800
+
 opx-nas-acl (2.8.0+opx3) unstable; urgency=medium
 
   * Update: Implement some CodeFactor improvements to scripts
