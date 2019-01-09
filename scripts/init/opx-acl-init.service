@@ -17,6 +17,7 @@
 Description=Default ACL entries for Control Plane Protocol packets
 After=opx-cps.service opx-nas.service
 Requires=opx-cps.service opx-nas.service
+ConditionPathExists=!/etc/opx/opx_acl_nocreate
 
 [Service]
 EnvironmentFile=/etc/opx/opx-environment
