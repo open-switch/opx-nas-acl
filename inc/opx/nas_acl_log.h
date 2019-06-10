@@ -33,6 +33,12 @@
 #define NAS_ACL_LOG_DETAIL(vararg...) \
         EV_LOGGING (ACL, DEBUG, "NAS-ACL", ## vararg)
 
+#define NAS_ACL_LOG_NOTICE(vararg...) \
+        EV_LOGGING (ACL, NOTICE, "NAS-ACL", ## vararg)
+
+#define NAS_ACL_LOG_WARNING(vararg...) \
+        EV_LOGGING (ACL, WARNING, "NAS-ACL", ## vararg)
+
 #define NAS_ACL_LOG_ERR(vararg...) \
         EV_LOGGING (ACL, ERR, "NAS-ACL", ## vararg)
 

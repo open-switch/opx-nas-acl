@@ -80,6 +80,20 @@ void nas_acl_action_t::get_obj_id_action_val (nas_acl_common_data_list_t& data_l
     data_list.push_back (data);
 }
 
+void nas_acl_action_t::set_u64_action_val (const nas_acl_common_data_list_t& data_list)
+{
+    _a_info.values_type = NDI_ACL_ACTION_U64;
+    _a_info.values.u64  = data_list.at(0).u64;
+}
+
+void nas_acl_action_t::get_u64_action_val (nas_acl_common_data_list_t& data_list) const
+{
+    nas_acl_common_data_t data {};
+
+    data.u64 = _a_info.values.u64;
+    data_list.push_back (data);
+}
+
 void nas_acl_action_t::set_u32_action_val (const nas_acl_common_data_list_t& data_list)
 {
     _a_info.values_type = NDI_ACL_ACTION_U32;
@@ -284,6 +298,21 @@ void nas_acl_action_t::get_opaque_data_nexthop_val (nas_acl_common_data_list_t& 
     }
 }
 
+void nas_acl_action_t::notify_ifindex_delete(int idx)
+{
+    _deleted_ifindex_list.push_back(idx);
+}
+
+bool nas_acl_action_t::ifindex_is_deleted(int idx) const
+{
+    if (find(_deleted_ifindex_list.begin(), _deleted_ifindex_list.end(), idx)
+            == _deleted_ifindex_list.end())
+        return false;
+    else
+        return true;
+}
+
+
 void nas_acl_action_t::update_port_mapping() const
 {
     interface_ctrl_t  intf_ctrl {};
@@ -293,6 +322,12 @@ void nas_acl_action_t::update_port_mapping() const
             return;
         }
         auto ifindex = _ifindex_list[0];
+
+        if (ifindex_is_deleted(ifindex)) {
+            _action_port_mapped = false;
+            return;
+        }
+
         if (nas_acl_utl_is_ifidx_type_lag(ifindex)) {
             return;
         }
@@ -308,10 +343,15 @@ void nas_acl_action_t::update_port_mapping() const
         }
     } else if (_a_info.values_type == NDI_ACL_ACTION_PORTLIST) {
         _npu_port_list.clear();
+
         for (auto ifindex: _ifindex_list) {
+            if (ifindex_is_deleted(ifindex))
+                continue;
+
             if (nas_acl_utl_is_ifidx_type_lag(ifindex)) {
                 continue;
             }
+
             memset(&intf_ctrl, 0, sizeof(intf_ctrl));
             nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
 
@@ -511,7 +551,7 @@ bool nas_acl_action_t::copy_action_ndi (ndi_acl_action_list_t& ndi_alist,
 
         if (!_ndi_copy_one_obj_id (ndi_alist.back(), npu_id)) {
             throw nas::base_exception {NAS_ACL_E_FAIL, __PRETTY_FUNCTION__,
-                std::string {name()} + ": Could not find object id for NPU " +
+                std::string {name()} + ": Could not find object ID for NPU " +
                 std::to_string (npu_id)};
         }
     }

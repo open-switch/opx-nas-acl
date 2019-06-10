@@ -568,6 +568,67 @@ void nas_acl_switch::remove_acl_range(nas_obj_id_t range_id) noexcept
     _range_objs.erase(range_id);
 }
 
+
+// Return pointer to ACl trap object of given trap id. Return NULL if no trap object found
+nas_acl_trap* nas_acl_switch::find_acl_trap (nas_obj_id_t trap_id) noexcept
+{
+    auto trap_itr = _trap_objs.find (trap_id);
+    if (trap_itr == _trap_objs.end ()) {
+        return nullptr;
+    }
+
+    return &trap_itr->second;
+}
+
+nas_acl_trap& nas_acl_switch::save_acl_trap(nas_acl_trap&& acl_trap) noexcept
+{
+    auto it = _trap_objs.find(acl_trap.trap_id());
+
+    if (it == _trap_objs.end()) {
+        auto p = _trap_objs.insert(std::make_pair(acl_trap.trap_id(), std::move(acl_trap)));
+        return (p.first->second);
+    }
+
+    // Update existing ACL Trap if present
+    return (it->second = std::move(acl_trap));
+}
+
+void nas_acl_switch::remove_acl_trap(nas_obj_id_t trap_id) noexcept
+{
+    _trap_objs.erase(trap_id);
+}
+
+
+// Return pointer to ACl trapgrp object of given trapgrp id. Return NULL if no trapgrp object found
+nas_acl_trapgrp* nas_acl_switch::find_acl_trapgrp (nas_obj_id_t trapgrp_id) noexcept
+{
+    auto trapgrp_itr = _trapgrp_objs.find (trapgrp_id);
+    if (trapgrp_itr == _trapgrp_objs.end ()) {
+        return nullptr;
+    }
+
+    return &trapgrp_itr->second;
+}
+
+nas_acl_trapgrp& nas_acl_switch::save_acl_trapgrp(nas_acl_trapgrp&& acl_trapgrp) noexcept
+{
+    auto it = _trapgrp_objs.find(acl_trapgrp.trapgrp_id());
+
+    if (it == _trapgrp_objs.end()) {
+        auto p = _trapgrp_objs.insert(std::make_pair(acl_trapgrp.trapgrp_id(), std::move(acl_trapgrp)));
+        return (p.first->second);
+    }
+
+    // Update existing ACL Trapgrp if present
+    return (it->second = std::move(acl_trapgrp));
+}
+
+void nas_acl_switch::remove_acl_trapgrp(nas_obj_id_t trapgrp_id) noexcept
+{
+    _trapgrp_objs.erase(trapgrp_id);
+}
+
+
 //Find given ACL pool in the cached NPU ACL pool entries
 //This is called during retrieval of ACL pool info
 acl_pool_id_t* nas_acl_switch::find_acl_pool (npu_id_t npu_id, nas_obj_id_t acl_pool_obj_id) noexcept
@@ -653,20 +714,50 @@ void nas_acl_switch::add_intf_acl_bind(hal_ifindex_t ifindex, const acl_rule_ite
 
 void nas_acl_switch::del_intf_acl_bind(hal_ifindex_t ifindex, const acl_rule_item_info_t& rule_item)
 {
-    interface_ctrl_t intf_ctrl;
-    memset(&intf_ctrl, 0, sizeof(interface_ctrl_t));
-    intf_ctrl.q_type = HAL_INTF_INFO_FROM_IF;
-    intf_ctrl.if_index = ifindex;
-    if (dn_hal_get_interface_info(&intf_ctrl) != STD_ERR_OK ||
-        intf_ctrl.int_type == nas_int_type_LAG) {
-        return;
-    }
     if (_intf_acl_bind_map.find(ifindex) != _intf_acl_bind_map.end()) {
         _intf_acl_bind_map[ifindex].remove_if([&rule_item](acl_rule_item_info_t& item)
                 {return item == rule_item;});
     }
 }
 
+void nas_acl_switch::if_delete_notify(hal_ifindex_t ifindex)
+{
+    std_mutex_simple_lock_guard mutex(&port_bind_mutex);
+
+    NAS_ACL_LOG_BRIEF("Delete ACL interface binding for ifindex %d",
+                      ifindex);
+    if (_intf_acl_bind_map.find(ifindex) == _intf_acl_bind_map.end()) {
+        return;
+    }
+    auto& item_list = _intf_acl_bind_map.at(ifindex);
+    for (auto& item: item_list) {
+        try {
+            // update NPU to exclude the delete port
+            auto& acl_entry = get_entry(item.table_id, item.entry_id);
+            if (item.is_match) {
+                NAS_ACL_LOG_BRIEF(" Delete ifindex %d with match type %d", ifindex, item.match_type);
+                if (!acl_entry.filter_intf_delete(item.match_type, ifindex)) {
+                    NAS_ACL_LOG_ERR("Failed to delete interface %d with match type %d",
+                                    ifindex,
+                                    item.match_type);
+                    return;
+                }
+            } else {
+                NAS_ACL_LOG_BRIEF(" Delete ifindex %d with action type %d", ifindex, item.action_type);
+                if (!acl_entry.action_intf_delete(item.action_type, ifindex)) {
+                    NAS_ACL_LOG_ERR("Failed to delete interface %d with action type %d",
+                                    ifindex,
+                                    item.action_type);
+                    return;
+                }
+            }
+
+        } catch (nas::base_exception& ex) {
+            NAS_ACL_LOG_ERR("Failed to get entry: %s", ex.err_msg.c_str());
+        }
+
+    }
+}
 void nas_acl_switch::process_intf_acl_bind(hal_ifindex_t ifindex,
                                            npu_id_t npu_id, npu_port_t npu_port)
 {

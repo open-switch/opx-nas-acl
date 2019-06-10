@@ -1098,6 +1098,33 @@ static const auto& _filter_map = *new nas_acl_filter_map_t
             &nas_acl_filter_t::set_bridge_type_filter_val,
         },
     },
+
+    {BASE_ACL_MATCH_TYPE_MCAST_ROUTE_DST_HIT,
+        {
+            "MATCH_TYPE_MCAST_ROUTE_DST_HIT",
+            {
+                BASE_ACL_ENTRY_MATCH_MCAST_ROUTE_DST_HIT_VALUE,
+                NAS_ACL_DATA_U32,
+                sizeof (uint32_t),
+                NAS_ACL_ATTR_MODE_OPTIONAL,
+                {false, true},
+            },
+            {},
+            &nas_acl_filter_t::get_u32_filter_val,
+            &nas_acl_filter_t::set_u32_filter_val,
+        },
+    },
+
+    {BASE_ACL_MATCH_TYPE_ROUTER_INTERFACE_USER_MARK,
+        {
+            "MATCH_TYPE_ROUTER_INTERFACE_USER_MARK",
+            {},
+            {},
+            nullptr,
+            nullptr,
+        },
+    }
+
 };
 
 // Return name of given filter type id

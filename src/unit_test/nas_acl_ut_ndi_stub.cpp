@@ -19,6 +19,7 @@
 #include "hal_if_mapping.h"
 #include "nas_ndi_switch.h"
 #include "nas_ndi_acl.h"
+#include "nas_ndi_trap.h"
 #include "nas_ndi_udf.h"
 #include "std_error_codes.h"
 #include "nas_acl_cps_ut.h"
@@ -356,6 +357,43 @@ t_std_error ndi_acl_range_create(npu_id_t npu_id, const ndi_acl_range_t *acl_ran
 }
 
 t_std_error ndi_acl_range_delete(npu_id_t npu_id, ndi_obj_id_t ndi_range_id)
+{
+    return STD_ERR_OK;
+}
+
+
+t_std_error ndi_acl_trapid_create(npu_id_t npu_id, nas_acl_trap_attr_t *trap_attr_params, size_t plen,
+                                  ndi_obj_id_t *ndi_trap_id_p)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_acl_trapid_set(npu_id_t npu_id, nas_acl_trap_attr_t *trap_attr_params, size_t plen,
+                               ndi_obj_id_t ndi_trap_id)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_acl_trapid_delete(npu_id_t npu_id, nas_acl_trap_attr_t *trap_attr_params,
+                                  ndi_obj_id_t ndi_trap_id)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_acl_trapgrp_create(npu_id_t npu_id, nas_acl_trap_attr_t *trap_attr_params, size_t plen,
+                                   ndi_obj_id_t *ndi_trap_grp_p)
+{
+    return STD_ERR_OK;
+}
+  
+
+t_std_error ndi_acl_trapgrp_set(npu_id_t npu_id, nas_acl_trap_attr_t *trap_attr_params, size_t plen,
+                                ndi_obj_id_t ndi_trap_grp)
+{
+    return STD_ERR_OK;
+}
+
+t_std_error ndi_acl_trapgrp_delete(npu_id_t npu_id, ndi_obj_id_t ndi_trap_grp)
 {
     return STD_ERR_OK;
 }

@@ -114,6 +114,7 @@ class nas_acl_action_t
         void set_u8_action_val (const nas_acl_common_data_list_t& data_list);
         void set_u16_action_val (const nas_acl_common_data_list_t& data_list);
         void set_u32_action_val (const nas_acl_common_data_list_t& data_list);
+        void set_u64_action_val (const nas_acl_common_data_list_t& data_list);
         void set_obj_id_action_val (const nas_acl_common_data_list_t& data_list);
         void set_ipv4_action_val (const nas_acl_common_data_list_t& data_list);
         void set_ipv6_action_val (const nas_acl_common_data_list_t& data_list);
@@ -131,6 +132,7 @@ class nas_acl_action_t
         void get_u8_action_val (nas_acl_common_data_list_t& data_list) const;
         void get_u16_action_val (nas_acl_common_data_list_t& data_list) const;
         void get_u32_action_val (nas_acl_common_data_list_t& data_list) const;
+        void get_u64_action_val (nas_acl_common_data_list_t& data_list) const;
         void get_obj_id_action_val (nas_acl_common_data_list_t& data_list) const;
         void get_ipv4_action_val (nas_acl_common_data_list_t& data_list) const;
         void get_ipv6_action_val (nas_acl_common_data_list_t& data_list) const;
@@ -158,6 +160,11 @@ class nas_acl_action_t
         // If action is releated to port, update the mapping from ifindex to NPU port
         void update_port_mapping() const;
 
+        // ifindex is deleted
+        void notify_ifindex_delete(int ifindex) ;
+        const nas::ifindex_list_t& get_deleted_if_list () const noexcept;
+        bool ifindex_is_deleted(int ifindex) const;
+
     private:
         void _set_opaque_data (const nas_acl_common_data_list_t& data_list);
         bool _ndi_copy_one_obj_id (ndi_acl_entry_action_t& ndi_action,
@@ -171,6 +178,9 @@ class nas_acl_action_t
         // Value for In/Out port/port-list Action and
         // Value for Redirect_port action
         nas::ifindex_list_t      _ifindex_list;
+
+        // cache for deleted ifindex
+        nas::ifindex_list_t  _deleted_ifindex_list;
 
         // List of NPU port for port-list action
         mutable std::unordered_map<npu_id_t, std::vector<npu_port_t>> _npu_port_list;
@@ -199,6 +209,13 @@ nas_acl_action_t::get_action_if_list () const noexcept
 {
     return _ifindex_list;
 }
+
+inline const nas::ifindex_list_t&
+nas_acl_action_t::get_deleted_if_list () const noexcept
+{
+    return _deleted_ifindex_list;
+}
+
 
 inline const char* nas_acl_action_t::name () const noexcept
 {

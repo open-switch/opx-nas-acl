@@ -1011,10 +1011,20 @@ static void _utl_modify_alist_npulist_ndi (nas_acl_entry&   entry_new,
                         deleted_alist, add_or_mod_alist);
 
     for (auto npu_id: npu_list) {
-        // Walk through the list of deleted actions and disable them in NDI
+        std::vector<nas_acl_entry::const_action_iter_t> del_itr_list{};
         for (nas_acl_entry::const_action_iter_t itr_del = deleted_alist.begin();
              itr_del != deleted_alist.end(); ++itr_del) {
+            const nas_acl_action_t& a_del = nas_acl_entry::get_action_from_itr (itr_del);
+            if (a_del.action_type() == BASE_ACL_ACTION_TYPE_SET_USER_TRAP_ID) {
+                // Put set_user_trap action to front of the list
+                del_itr_list.insert(del_itr_list.begin(), itr_del);
+            } else {
+                del_itr_list.push_back(itr_del);
+            }
+        }
 
+        // Walk through the list of deleted actions and disable them in NDI
+        for (auto itr_del: del_itr_list) {
             const nas_acl_action_t& a_del = nas_acl_entry::get_action_from_itr (itr_del);
             NAS_ACL_LOG_DETAIL ("Push Disable %s to NPU %d",
                                 nas_acl_action_t::type_name(a_del.action_type()),
@@ -1277,6 +1287,46 @@ bool nas_acl_entry::action_intf_mapping_update(BASE_ACL_ACTION_TYPE_t a_type,
         const nas_acl_action_t& action = get_action(a_type);
         action.update_port_mapping();
         update_action_to_npu(npu_id, action, false);
+    } catch (nas::base_exception& e) {
+        NAS_ACL_LOG_ERR("Err_code: 0x%x, fn: %s (), %s", e.err_code,
+                        e.err_fn.c_str(), e.err_msg.c_str());
+        return false;
+    } catch (std::exception& e) {
+        NAS_ACL_LOG_ERR("Unknown Err: %s", e.what());
+        return false;
+    }
+    return true;
+}
+
+bool nas_acl_entry::filter_intf_delete(BASE_ACL_MATCH_TYPE_t f_type,
+                                               hal_ifindex_t ifindex) noexcept
+{
+    try {
+        nas_acl_filter_t& filter = const_cast<nas_acl_filter_t&>(get_filter(f_type, 0));
+        filter.notify_ifindex_delete(ifindex);
+        filter.update_port_mapping();
+        for (auto npu_id : npu_list())
+            update_filter_to_npu(npu_id, filter, false);
+    } catch (nas::base_exception& e) {
+        NAS_ACL_LOG_ERR("Err_code: 0x%x, fn: %s (), %s", e.err_code,
+                        e.err_fn.c_str(), e.err_msg.c_str());
+        return false;
+    } catch (std::exception& e) {
+        NAS_ACL_LOG_ERR("Unknown Err: %s", e.what());
+        return false;
+    }
+    return true;
+}
+
+bool nas_acl_entry::action_intf_delete(BASE_ACL_ACTION_TYPE_t a_type,
+                                               hal_ifindex_t ifindex) noexcept
+{
+    try {
+        nas_acl_action_t& action = const_cast<nas_acl_action_t&>(get_action(a_type));
+        action.notify_ifindex_delete(ifindex);
+        action.update_port_mapping();
+        for (auto npu_id : npu_list())
+            update_action_to_npu(npu_id, action, false);
     } catch (nas::base_exception& e) {
         NAS_ACL_LOG_ERR("Err_code: 0x%x, fn: %s (), %s", e.err_code,
                         e.err_fn.c_str(), e.err_msg.c_str());

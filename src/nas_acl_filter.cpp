@@ -54,7 +54,8 @@ nas_acl_filter_t::nas_acl_filter_t (const nas_acl_table* table, BASE_ACL_MATCH_T
     if (t == BASE_ACL_MATCH_TYPE_FDB_DST_HIT ||
         t == BASE_ACL_MATCH_TYPE_NEIGHBOR_DST_HIT ||
         t == BASE_ACL_MATCH_TYPE_DROP_MARKED ||
-        t == BASE_ACL_MATCH_TYPE_ROUTE_DST_HIT) {
+        t == BASE_ACL_MATCH_TYPE_ROUTE_DST_HIT ||
+        t == BASE_ACL_MATCH_TYPE_MCAST_ROUTE_DST_HIT) {
         _f_info.values_type = NDI_ACL_FILTER_BOOL;
     }
 }
@@ -309,6 +310,21 @@ void nas_acl_filter_t::get_filter_ifindex_list (nas_acl_common_data_list_t& val_
     }
 }
 
+
+void nas_acl_filter_t::notify_ifindex_delete(int idx)
+{
+    _deleted_ifindex_list.push_back(idx);
+}
+
+bool nas_acl_filter_t::ifindex_is_deleted(int idx) const
+{
+    if (find(_deleted_ifindex_list.begin(), _deleted_ifindex_list.end(), idx)
+            == _deleted_ifindex_list.end())
+        return false;
+    else
+        return true;
+}
+
 void nas_acl_filter_t::update_port_mapping() const
 {
     interface_ctrl_t  intf_ctrl {};
@@ -317,7 +333,14 @@ void nas_acl_filter_t::update_port_mapping() const
             NAS_ACL_LOG_ERR("Filter should contain only 1 interface");
             return;
         }
+
         auto ifindex = _ifindex_list[0];
+
+        if (ifindex_is_deleted(ifindex)) {
+            _match_port_mapped = false;
+            return;
+        }
+
         if (nas_acl_utl_is_ifidx_type_lag(ifindex)) {
             return;
         }
@@ -333,10 +356,15 @@ void nas_acl_filter_t::update_port_mapping() const
         }
     } else if (_f_info.values_type == NDI_ACL_FILTER_PORTLIST) {
         _npu_port_list.clear();
+
         for (auto ifindex: _ifindex_list) {
+            if (ifindex_is_deleted(ifindex))
+                continue;
+
             if (nas_acl_utl_is_ifidx_type_lag(ifindex)) {
                 continue;
             }
+
             memset(&intf_ctrl, 0, sizeof(intf_ctrl));
             nas_acl_utl_ifidx_to_ndi_port (ifindex, &intf_ctrl);
 

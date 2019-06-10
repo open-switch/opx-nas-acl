@@ -116,6 +116,11 @@ class nas_acl_filter_t
         // If action is releated to port, update the mapping from ifindex to NPU port
         void update_port_mapping() const;
 
+        // ifindex is deleted
+        void notify_ifindex_delete(int ifindex) ;
+        const nas::ifindex_list_t& get_deleted_if_list () const noexcept;
+        bool ifindex_is_deleted(int ifindex) const;
+
     private:
         bool _ndi_copy_one_obj_id(ndi_acl_entry_filter_t* ndi_filter_p,
                                   npu_id_t npu_id) const;
@@ -129,6 +134,9 @@ class nas_acl_filter_t
         std::unordered_map<nas_obj_id_t, nas::ndi_obj_id_table_t>  _nas2ndi_oid_tbl;
         mutable ndi_acl_entry_filter_t   _f_info;
         nas::ifindex_list_t   _ifindex_list;
+
+        // cache for deleted ifindex
+        nas::ifindex_list_t  _deleted_ifindex_list;
 
         // List of NPU port for port-list filter
         mutable std::unordered_map<npu_id_t, std::vector<npu_port_t>> _npu_port_list;
@@ -146,6 +154,12 @@ inline const nas::ifindex_list_t&
 nas_acl_filter_t::get_filter_if_list () const noexcept
 {
     return _ifindex_list;
+}
+
+inline const nas::ifindex_list_t&
+nas_acl_filter_t::get_deleted_if_list () const noexcept
+{
+    return _deleted_ifindex_list;
 }
 
 inline const char* nas_acl_filter_t::name () const noexcept

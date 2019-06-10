@@ -505,7 +505,7 @@ static bool nas_acl_ut_add_acl_entry_action(cps_api_object_t obj)
         return false;
     }
     if (!ADD_ENTRY_ITEM_VALUE(obj, index, BASE_ACL_ENTRY_ACTION_SET_USER_TRAP_ID_VALUE,
-            ADD_ACTION_VALUE_U32, 0x34)) {
+            ADD_ACTION_VALUE_U64, 0x34)) {
         return false;
     }
 

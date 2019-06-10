@@ -37,8 +37,8 @@ static bool _add_data_to_obj (cps_api_object_t       obj,
                               NAS_ACL_DATA_TYPE_t    obj_data_type)
 {
     cps_api_object_ATTR_TYPE_t  cps_attr_type;
-    void                       *p_data;
-    size_t                      size;
+    void                       *p_data = 0;
+    size_t                      size = 0;
 
     if (obj_data_type == NAS_ACL_DATA_OPAQUE) {
         return nas::ndi_obj_id_table_cps_serialize (in_common_data.ndi_obj_id_table,
@@ -91,9 +91,7 @@ static bool _add_data_to_obj (cps_api_object_t       obj,
             char if_name[HAL_IF_NAME_SZ];
             if (cps_api_interface_if_index_to_name(in_common_data.ifindex,
                         if_name, sizeof(if_name)) == NULL) {
-                NAS_ACL_LOG_ERR ("Invalid interface index %d",
-                        in_common_data.ifindex);
-                return false;
+                break;
             }
             auto& bytes = in_common_data.bytes;
             bytes.insert(bytes.begin(), if_name, if_name + strlen(if_name));
@@ -264,7 +262,6 @@ _copy_iflist_data_to_obj (cps_api_object_t            obj,
         if (use_ifname) {
             if(cps_api_interface_if_index_to_name(if_index, intf_name,
                     sizeof(intf_name)) == NULL) {
-                NAS_ACL_LOG_ERR ("Invalid interface index %d", if_index);
                 continue;
             }
             attr_data = intf_name;

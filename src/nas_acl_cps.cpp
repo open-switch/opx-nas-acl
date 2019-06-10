@@ -405,6 +405,201 @@ nas_udf_cps_api_rollback (void                         *context,
     return static_cast<cps_api_return_code_t>(rc);
 }
 
+
+cps_api_return_code_t
+nas_trap_cps_api_read (void                 *context,
+                       cps_api_get_params_t *param,
+                       size_t                index)
+{
+    t_std_error rc = NAS_ACL_E_UNSUPPORTED;
+
+    cps_api_object_t filter_obj = cps_api_object_list_get (param->filters, index);
+
+    if (filter_obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Trap Object to read");
+        return cps_api_ret_code_ERR;
+    }
+
+    nas_acl_lock ();
+
+    rc = nas_trap_get_trap(param, index, filter_obj);
+
+    nas_acl_unlock ();
+
+    return static_cast <cps_api_return_code_t> (rc);
+}
+
+static t_std_error
+nas_trap_cps_api_write_internal (void                         *context,
+                                 cps_api_transaction_params_t *param,
+                                 cps_api_object_t              obj,
+                                 cps_api_operation_types_t     op,
+                                 bool                          rollback)
+{
+    bool save_prev = !rollback;
+    nas_acl_write_operation_map_t  *p_op_map = NULL;
+
+    cps_api_object_t prev = NULL;
+
+    p_op_map = nas_acl_reg_trap_operation_map(op);
+    if (p_op_map == NULL) {
+        NAS_ACL_LOG_ERR ("Operation %d NOT allowed on Trap Obj", op);
+        return NAS_ACL_E_UNSUPPORTED;
+    }
+
+    if (save_prev) {
+        prev = cps_api_object_list_create_obj_and_append(param->prev);
+        if (prev == NULL) {
+            return (NAS_ACL_E_MEM);
+        }
+    }
+
+    return nas_acl_exec_write_op (p_op_map, obj, prev, rollback);
+}
+
+cps_api_return_code_t
+nas_trap_cps_api_write (void                         *context,
+                        cps_api_transaction_params_t *param,
+                        size_t                        index)
+{
+    cps_api_object_t          obj;
+    cps_api_operation_types_t op;
+
+    obj = cps_api_object_list_get (param->change_list, index);
+    if (obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Change Trap Object");
+        return cps_api_ret_code_ERR;
+    }
+
+    op = cps_api_object_type_operation (cps_api_object_key (obj));
+
+    auto rc = nas_trap_cps_api_write_internal(context, param, obj, op, false);
+    return static_cast<cps_api_return_code_t>(rc);
+}
+
+cps_api_return_code_t
+nas_trap_cps_api_rollback (void                        *context,
+                          cps_api_transaction_params_t *param,
+                          size_t                        index)
+{
+    cps_api_object_t          obj;
+    cps_api_operation_types_t op;
+
+    obj = cps_api_object_list_get (param->prev, index);
+
+    if (obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Previous saved trap Object");
+        return cps_api_ret_code_ERR;
+    }
+
+    op = cps_api_object_type_operation (cps_api_object_key (obj));
+
+    op = ((op == cps_api_oper_CREATE) ? cps_api_oper_DELETE :
+          (op == cps_api_oper_DELETE) ? cps_api_oper_CREATE : op);
+
+    auto rc = nas_trap_cps_api_write_internal(context, param, obj, op, true);
+
+    return static_cast<cps_api_return_code_t>(rc);
+}
+
+
+cps_api_return_code_t
+nas_trapgrp_cps_api_read (void                 *context,
+                       	  cps_api_get_params_t *param,
+                       	  size_t                index)
+{
+    t_std_error rc = NAS_ACL_E_UNSUPPORTED;
+
+    cps_api_object_t filter_obj = cps_api_object_list_get (param->filters, index);
+
+    if (filter_obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Trapgrp Object to read");
+        return cps_api_ret_code_ERR;
+    }
+
+    nas_acl_lock ();
+
+    rc = nas_trap_get_trapgrp(param, index, filter_obj);
+
+    nas_acl_unlock ();
+
+    return static_cast <cps_api_return_code_t> (rc);
+}
+
+static t_std_error
+nas_trapgrp_cps_api_write_internal (void                         *context,
+                                    cps_api_transaction_params_t *param,
+                                    cps_api_object_t              obj,
+                                    cps_api_operation_types_t     op,
+                                    bool                          rollback)
+{
+    bool save_prev = !rollback;
+    nas_acl_write_operation_map_t  *p_op_map = NULL;
+
+    cps_api_object_t prev = NULL;
+
+    p_op_map = nas_acl_reg_trapgrp_operation_map(op);
+    if (p_op_map == NULL) {
+        NAS_ACL_LOG_ERR ("Operation %d NOT allowed on Trapgrp Obj", op);
+        return NAS_ACL_E_UNSUPPORTED;
+    }
+
+    if (save_prev) {
+        prev = cps_api_object_list_create_obj_and_append(param->prev);
+        if (prev == NULL) {
+            return (NAS_ACL_E_MEM);
+        }
+    }
+
+    return nas_acl_exec_write_op (p_op_map, obj, prev, rollback);
+}
+
+cps_api_return_code_t
+nas_trapgrp_cps_api_write (void                         *context,
+                           cps_api_transaction_params_t *param,
+                           size_t                        index)
+{
+    cps_api_object_t          obj;
+    cps_api_operation_types_t op;
+
+    obj = cps_api_object_list_get (param->change_list, index);
+    if (obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Change Trapgrp Object");
+        return cps_api_ret_code_ERR;
+    }
+
+    op = cps_api_object_type_operation (cps_api_object_key (obj));
+
+    auto rc = nas_trapgrp_cps_api_write_internal(context, param, obj, op, false);
+    return static_cast<cps_api_return_code_t>(rc);
+}
+
+cps_api_return_code_t
+nas_trapgrp_cps_api_rollback (void                        *context,
+                              cps_api_transaction_params_t *param,
+                              size_t                        index)
+{
+    cps_api_object_t          obj;
+    cps_api_operation_types_t op;
+
+    obj = cps_api_object_list_get (param->prev, index);
+
+    if (obj == NULL) {
+        NAS_ACL_LOG_ERR ("Missing Previous saved trapgrp Object");
+        return cps_api_ret_code_ERR;
+    }
+
+    op = cps_api_object_type_operation (cps_api_object_key (obj));
+
+    op = ((op == cps_api_oper_CREATE) ? cps_api_oper_DELETE :
+          (op == cps_api_oper_DELETE) ? cps_api_oper_CREATE : op);
+
+    auto rc = nas_trapgrp_cps_api_write_internal(context, param, obj, op, true);
+
+    return static_cast<cps_api_return_code_t>(rc);
+}
+
+
 /**
  * Delete PBR ACL entry action with a matching Next Hop object
  * @Param  Next Hop object id
