@@ -28,12 +28,32 @@
 #include "std_error_codes.h"
 #include "nas_acl_cps.h"
 #include "nas_udf_cps.h"
+#include "nas_trap_cps.h"
+#include "nas_trapgrp_cps.h"
 #include "nas_acl_init.h"
 #include "nas_acl_log.h"
 #include "nas_if_utils.h"
 #include "dell-base-if.h"
 #include "std_mutex_lock.h"
 #include "dell-base-if-phy.h"
+
+static void nas_acl_if_delete_notify(uint32_t ifidx)
+{
+
+    nas_switch_id_t switch_id = NAS_ACL_DEFAULT_SWITCH_ID();
+    try {
+        nas_acl_switch& sw = nas_acl_get_switch(switch_id);
+        sw.if_delete_notify(ifidx);
+    } catch (nas::base_exception& e) {
+        NAS_ACL_LOG_ERR("Err_code: 0x%x, fn: %s (), %s", e.err_code,
+                        e.err_fn.c_str(), e.err_msg.c_str());
+    } catch (std::exception& e) {
+        NAS_ACL_LOG_ERR("Unknown Err: %s", e.what());
+    }
+
+    return ;
+}
+
 
 static bool nas_acl_if_set_handler(cps_api_object_t obj, void *context)
 {
@@ -55,6 +75,13 @@ static bool nas_acl_if_set_handler(cps_api_object_t obj, void *context)
 
     cps_api_operation_types_t op = cps_api_object_type_operation(cps_api_object_key(obj));
     nas_int_port_mapping_t status = nas_int_phy_port_UNMAPPED;
+
+    if (op == cps_api_oper_DELETE) {
+        NAS_ACL_LOG_NOTICE("ifindex %d is deleted", ifidx);
+        nas_acl_if_delete_notify(ifidx);
+        return true;
+    }
+
     if (op == cps_api_oper_SET && nas_get_phy_port_mapping_change(obj, &status)) {
         NAS_ACL_LOG_BRIEF("Interface mapping changed to: %s",
                    status == nas_int_phy_port_MAPPED ? "Mapped" : "Un-mapped");
@@ -152,6 +179,58 @@ static t_std_error _cps_init ()
 
     if (rc != cps_api_ret_code_OK) {
         NAS_ACL_LOG_ERR ("NAS UDF CPS object Register failed");
+        return STD_ERR(ACL, FAIL, rc);
+    }
+
+    memset (&f, 0, sizeof(f));
+
+    f.handle             = handle;
+    f._read_function     = nas_trap_cps_api_read;
+    f._write_function    = nas_trap_cps_api_write;
+    f._rollback_function = nas_trap_cps_api_rollback;
+
+    /*
+     * Register all TRAP objects
+     */
+    if (!cps_api_key_from_attr_with_qual(&f.key, BASE_TRAP_TRAP_OBJ,
+                                         cps_api_qualifier_TARGET)) {
+        NAS_ACL_LOG_ERR ("Could not translate %d to key %s",
+                        (int)(BASE_TRAP_TRAP_OBJ),
+                        cps_api_key_print(&f.key,buff,sizeof(buff)-1));
+
+        return STD_ERR(ACL,FAIL,0);
+    }
+
+    rc = cps_api_register (&f);
+
+    if (rc != cps_api_ret_code_OK) {
+        NAS_ACL_LOG_ERR ("NAS TRAP CPS object Register failed");
+        return STD_ERR(ACL, FAIL, rc);
+    }
+
+    memset (&f, 0, sizeof(f));
+
+    f.handle             = handle;
+    f._read_function     = nas_trapgrp_cps_api_read;
+    f._write_function    = nas_trapgrp_cps_api_write;
+    f._rollback_function = nas_trapgrp_cps_api_rollback;
+
+    /*
+     * Register all TRAPGRP objects
+     */
+    if (!cps_api_key_from_attr_with_qual(&f.key, BASE_TRAP_TRAP_GROUP_OBJ,
+                                         cps_api_qualifier_TARGET)) {
+        NAS_ACL_LOG_ERR ("Could not translate %d to key %s",
+                        (int)(BASE_TRAP_TRAP_GROUP_OBJ),
+                        cps_api_key_print(&f.key,buff,sizeof(buff)-1));
+
+        return STD_ERR(ACL,FAIL,0);
+    }
+
+    rc = cps_api_register (&f);
+
+    if (rc != cps_api_ret_code_OK) {
+        NAS_ACL_LOG_ERR ("NAS TRAPGRP CPS object Register failed");
         return STD_ERR(ACL, FAIL, rc);
     }
 
@@ -323,6 +402,7 @@ t_std_error nas_acl_init(void)
 
     return rc;
 }
+
 
 
 }

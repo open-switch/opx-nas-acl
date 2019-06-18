@@ -15,13 +15,14 @@
 
 [Unit]
 Description=Default ACL entries for Control Plane Protocol packets
+ConditionPathExists=!/etc/opx/base_acl_nocreate
 After=opx-cps.service opx-nas.service
 Requires=opx-cps.service opx-nas.service
 
 [Service]
 EnvironmentFile=/etc/opx/opx-environment
 ExecStart=/usr/bin/python -u /usr/bin/base_create_acl_entries.py
-TimeoutStartSec=180
+TimeoutStartSec=90
 
 [Install]
 WantedBy=multi-user.target

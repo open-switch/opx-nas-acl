@@ -203,6 +203,10 @@ class nas_acl_entry final : public nas::base_obj_t
         void update_action_to_npu(npu_id_t npu_id, const nas_acl_action_t& action,
                                   bool del_action);
 
+        bool filter_intf_delete(BASE_ACL_MATCH_TYPE_t f_type,
+                                hal_ifindex_t ifindex) noexcept;
+        bool action_intf_delete(BASE_ACL_ACTION_TYPE_t a_type,
+                                hal_ifindex_t ifindex) noexcept;
     private:
         nas_obj_id_t                 _entry_id = 0;
         std::string                  _entry_name;

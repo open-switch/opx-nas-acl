@@ -78,6 +78,7 @@ filter_name2val_map = {
     'RANGE_CHECK': 'RANGE_CHECK_VALUE',
     'DROP_MARKED': 'DROP_MARKED_VALUE',
     'BRIDGE_TYPE': 'BRIDGE_TYPE_VALUE',
+    'MCAST_ROUTE_DST_HIT': 'MCAST_ROUTE_DST_HIT_VALUE',
 }
 
 action_name2val_map = {
@@ -256,6 +257,7 @@ entry_attr_map = {
     'match/FDB_DST_HIT_VALUE': ('leaf', 'bool'),
     'match/DROP_MARKED_VALUE': ('leaf', 'bool'),
     'match/BRIDGE_TYPE_VALUE': ('leaf', 'enum', 'base-acl:match-bridge-type:'),
+    'match/MCAST_ROUTE_DST_HIT_VALUE': ('leaf', 'bool'),
 
     'action/PACKET_ACTION_VALUE':
     ('leaf', 'enum', 'base-acl:packet-action-type:'),
@@ -307,7 +309,7 @@ entry_attr_map = {
     'action/REDIRECT_INTF_VALUE': ('leaf', 'string'),
     'action/REDIRECT_INTF_MASK_VALUE': ('leaf', 'string'),
     'action/REDIRECT_INTF_LIST_VALUE': ('leaflist', 'string'),
-    'action/SET_USER_TRAP_ID_VALUE': ('leaf', 'uint32_t'),
+    'action/SET_USER_TRAP_ID_VALUE': ('leaf', 'uint64_t'),
     'action/SET_PACKET_COLOR_VALUE': ('leaf', 'enum', 'base-acl:packet-color:'),
 }
 
@@ -410,6 +412,8 @@ enum_map = {
     'base-acl:match-type:FDB_DST_HIT': 45,
     'base-acl:match-type:DROP_MARKED': 46,
     'base-acl:match-type:BRIDGE_TYPE': 47,
+    'base-acl:match-type:MCAST_ROUTE_DST_HIT': 48,
+    'base-acl:match-type:ROUTER_INTERFACE_USER_MARK': 49,
 
     'base-acl:packet-action-type:DROP': 1,
     'base-acl:packet-action-type:FORWARD': 2,

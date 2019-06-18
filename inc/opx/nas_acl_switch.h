@@ -29,6 +29,8 @@
 #include "nas_acl_entry.h"
 #include "nas_acl_table.h"
 #include "nas_acl_range.h"
+#include "nas_acl_trap.h"
+#include "nas_acl_trapgrp.h"
 #include "nas_udf_group.h"
 #include "nas_udf_match.h"
 #include "nas_udf.h"
@@ -81,6 +83,8 @@ class nas_acl_switch : public nas::base_switch_t
         typedef std::map<nas_obj_id_t, nas_udf> udf_list_t;
 
         typedef std::map<nas_obj_id_t, nas_acl_range> range_list_t;
+        typedef std::map<nas_obj_id_t, nas_acl_trap>  trap_list_t;
+        typedef std::map<nas_obj_id_t, nas_acl_trapgrp>  trapgrp_list_t;
 
         typedef std::vector<acl_pool_id_t> acl_pool_list_t;
 
@@ -121,10 +125,17 @@ class nas_acl_switch : public nas::base_switch_t
         nas_acl_range*        find_acl_range(nas_obj_id_t range_id) noexcept;
         const range_list_t& range_obj_list() const noexcept {return _range_objs;}
 
+        nas_acl_trap*         find_acl_trap(nas_obj_id_t trap_id) noexcept;
+        const trap_list_t&    trap_obj_list() const noexcept {return _trap_objs;}
+
+        nas_acl_trapgrp*      find_acl_trapgrp (nas_obj_id_t trapgrp_id) noexcept;
+        const trapgrp_list_t& trapgrp_obj_list() const noexcept {return _trapgrp_objs;}
+
         acl_pool_id_t*         find_acl_pool(npu_id_t npu_id, nas_obj_id_t id) noexcept;
         const acl_pool_list_t& acl_pool_obj_list() const noexcept {return _cached_acl_pool_entries;}
         void                   mark_acl_pool_cache_init_done () noexcept {_nas_acl_pool_cache_init_done = true;}
         bool                   is_acl_pool_cache_init_done () const noexcept {return _nas_acl_pool_cache_init_done;}
+
 
         ///////// Modifiers //////////
         ///// ACL Table list
@@ -189,6 +200,12 @@ class nas_acl_switch : public nas::base_switch_t
         nas_acl_range& save_acl_range(nas_acl_range&& acl_range) noexcept;
         void remove_acl_range(nas_obj_id_t id) noexcept;
 
+        nas_acl_trap& save_acl_trap(nas_acl_trap&& acl_trap) noexcept;
+        void remove_acl_trap(nas_obj_id_t id) noexcept;
+
+        nas_acl_trapgrp& save_acl_trapgrp(nas_acl_trapgrp&& acl_trapgrp) noexcept;
+        void remove_acl_trapgrp(nas_obj_id_t trapgrp_id) noexcept;
+
         bool save_acl_pool(npu_id_t npu_id, nas_obj_id_t id) noexcept;
         void remove_acl_pool(npu_id_t npu_id, nas_obj_id_t id) noexcept;
 
@@ -204,6 +221,7 @@ class nas_acl_switch : public nas::base_switch_t
         void update_intf_action_bind(const nas_acl_entry& entry,
                                      const nas_acl_action_t* old_action,
                                      const nas_acl_action_t* new_action) noexcept;
+        void if_delete_notify(hal_ifindex_t ifindex);
 
         void dump_rule_intf_bind(void) const noexcept;
     private:
@@ -233,6 +251,8 @@ class nas_acl_switch : public nas::base_switch_t
         nas::id_generator_t     _udf_id_gen {NAS_UDF_ID_MAX};
 
         range_list_t            _range_objs;
+        trap_list_t             _trap_objs;
+        trapgrp_list_t          _trapgrp_objs;
 
         nas::id_generator_t     _range_id_gen {NAS_ACL_RANGE_ID_MAX};
 
@@ -277,18 +297,10 @@ class nas_acl_switch : public nas::base_switch_t
         {
             add_list = new_list;
             for (auto ifidx: old_list) {
-                bool found = false;
-                for (auto itor = add_list.begin(); itor != add_list.end();)
-                {
-                    if (ifidx == *itor) {
-                        itor = add_list.erase(itor);
-                        found = true;
-                        break;
-                    } else {
-                        ++ itor;
-                    }
-                }
-                if (!found) {
+                auto found = std::find(add_list.begin(), add_list.end(), ifidx);
+                if (found != add_list.end()) {
+                    add_list.erase(found);
+                } else {
                     del_list.push_back(ifidx);
                 }
             }

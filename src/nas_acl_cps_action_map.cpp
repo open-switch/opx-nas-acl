@@ -581,14 +581,14 @@ static const auto& _action_map = *new nas_acl_action_map_t
             "ACTION_TYPE_SET_USER_TRAP_ID",
             {
                 BASE_ACL_ENTRY_ACTION_SET_USER_TRAP_ID_VALUE,
-                NAS_ACL_DATA_U32,
-                sizeof (uint32_t),
+                NAS_ACL_DATA_OBJ_ID,
+                sizeof (nas_obj_id_t),
                 NAS_ACL_ATTR_MODE_MANDATORY,
                 {},
             },
             {},
-            &nas_acl_action_t::get_u32_action_val,
-            &nas_acl_action_t::set_u32_action_val,
+            &nas_acl_action_t::get_u64_action_val,
+            &nas_acl_action_t::set_u64_action_val,
         },
     },
 

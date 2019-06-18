@@ -191,6 +191,12 @@ nas_acl_get_stats_op_map (cps_api_operation_types_t op) noexcept;
 nas_acl_write_operation_map_t *
 nas_acl_get_range_operation_map (cps_api_operation_types_t op) noexcept;
 
+nas_acl_write_operation_map_t *
+nas_acl_reg_trap_operation_map (cps_api_operation_types_t op) noexcept;
+
+nas_acl_write_operation_map_t *
+nas_acl_reg_trapgrp_operation_map (cps_api_operation_types_t op) noexcept;
+
 void nas_acl_set_match_list (const cps_api_object_t     obj,
                              const cps_api_object_it_t& it,
                              nas_acl_entry&             entry);
@@ -277,6 +283,12 @@ t_std_error           nas_udf_create(cps_api_object_t obj,
 t_std_error           nas_udf_delete(cps_api_object_t obj,
                                      cps_api_object_t prev,
                                      bool is_rollbk) noexcept;
+
+t_std_error           nas_trap_get_trap (cps_api_get_params_t *param, size_t index,
+                                         cps_api_object_t filter_obj) noexcept;
+
+t_std_error           nas_trap_get_trapgrp (cps_api_get_params_t *param, size_t index,
+                                            cps_api_object_t filter_obj) noexcept;
 
 t_std_error           nas_acl_get_range (cps_api_get_params_t *param, size_t index,
                                          cps_api_object_t filter_obj) noexcept;
