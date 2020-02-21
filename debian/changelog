@@ -1,3 +1,9 @@
+opx-nas-acl (2.12.2) unstable; urgency=medium
+
+  * Bugfix: Fixed issue where acl-config fails to load acl configuration from acl-config.yaml
+
+ -- Dell EMC <ops-dev@lists.openswitch.net>  Wed, 19 Feb 2020 04:16:39 -0800
+
 opx-nas-acl (2.12.1) unstable; urgency=medium
 
   * Feature: Trap group support

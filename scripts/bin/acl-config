@@ -36,9 +36,9 @@ _key_for_cfg = cps.key_from_name('target',_KEY)
 _key_for_reload = cps.key_from_name('target','acl-config/reload')
 
 
-_valid_match_fields_in=['SRC_IP','DST_IP','OUT_INTF','SRC_INTF','L4_SRC_PORT','L4_DST_PORT','SRC_MAC','DST_MAC','IP_PROTOCOL','TCP_FLAGS']
+_valid_match_fields_in=['SRC_IP','DST_IP','IN_PORT','OUT_PORT','L4_SRC_PORT','L4_DST_PORT','SRC_MAC','DST_MAC','IP_PROTOCOL','TCP_FLAGS']
 
-_valid_match_fields_eg=['DST_IP', 'L4_SRC_PORT', 'L4_DST_PORT', 'IP_PROTOCOL', 'OUT_INTF']
+_valid_match_fields_eg=['SRC_IP','DST_IP','IN_PORT','OUT_PORT','L4_SRC_PORT','L4_DST_PORT','SRC_MAC','DST_MAC','IP_PROTOCOL','TCP_FLAGS']
 
 _default_table_prio = 110
 _default_entry_prio = 30
@@ -228,10 +228,10 @@ def __acl_cfg_to_acl_entry(obj, create_if_not_there=False):
 
 
     if _args['in_interface']!=None:
-        _filters['SRC_INTF'] = _args['in_interface']
+        _filters['IN_PORT'] = _args['in_interface']
 
     if _args['out_interface']!=None:
-        _filters['OUT_INTF'] = _args['out_interface']
+        _filters['OUT_PORT'] = _args['out_interface']
     
     if _args['protocol']!=None:
         with open('/etc/protocols') as f:
